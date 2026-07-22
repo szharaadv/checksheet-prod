@@ -1,0 +1,154 @@
+<?php
+require_once __DIR__ . '/config/db.php';
+$pdo = get_db();
+
+if (isset($_GET['department_id'])) {
+    $_SESSION['department_id'] = (int)$_GET['department_id'];
+}
+
+$department_id = $_SESSION['department_id'] ?? null;
+
+$department = null;
+if ($department_id) {
+    $stmt = $pdo->prepare("SELECT * FROM m_department WHERE id = ? AND is_active = 1 AND form_type = 'assembly'");
+    $stmt->execute([$department_id]);
+    $department = $stmt->fetch();
+}
+
+if (!$department) {
+    header('Location: index.php');
+    exit;
+}
+
+$_SESSION['section_route'] = 'assembly_list.php';
+
+$stmt = $pdo->prepare('SELECT * FROM m_checker WHERE department_id = ? AND is_active = 1 ORDER BY name');
+$stmt->execute([$department['id']]);
+$checkers = $stmt->fetchAll();
+
+$stmt = $pdo->prepare('SELECT * FROM m_assy_model WHERE department_id = ? AND is_active = 1 ORDER BY sort_order');
+$stmt->execute([$department['id']]);
+$models = $stmt->fetchAll();
+
+$draft = null;
+$draft_values = [];
+$draft_id = (int)($_GET['draft_id'] ?? 0);
+if ($draft_id) {
+    $stmt = $pdo->prepare("SELECT * FROM t_assy_header WHERE id = ? AND status = 'draft'");
+    $stmt->execute([$draft_id]);
+    $draft = $stmt->fetch();
+
+    if ($draft) {
+        $stmt = $pdo->prepare('SELECT checklist_item_id, actual_result, consumable_item FROM t_assy_detail WHERE header_id = ?');
+        $stmt->execute([$draft_id]);
+        foreach ($stmt->fetchAll() as $d) {
+            $draft_values[$d['checklist_item_id']] = ['actual' => $d['actual_result'], 'consumable' => $d['consumable_item']];
+        }
+    }
+}
+
+$selected_model_id = $_GET['model_id'] ?? ($draft['model_id'] ?? ($models[0]['id'] ?? null));
+
+$base_url = '';
+$active_nav = 'checksheet';
+$page_title = 'Production Check Sheet - Daily Torque';
+$page_subtitle = $department['name'] . ' · Fill daily production record';
+require __DIR__ . '/includes/app_top.php';
+?>
+
+<div class="checksheet-card">
+    <div class="dept-context">
+        <span class="dept-context-label">Department:</span>
+        <span class="dept-context-name"><?= htmlspecialchars($department['name']) ?></span>
+        <a href="select_section.php?department_id=<?= $department['id'] ?>" class="dept-switch-link">Change Section</a>
+        <a href="index.php" class="dept-switch-link">Change Department</a>
+    </div>
+
+    <div class="form-grid-top">
+        <div class="field-block">
+            <label>Date</label>
+            <input type="date" id="f_tanggal" value="<?= htmlspecialchars($draft['tanggal'] ?? date('Y-m-d')) ?>" readonly>
+        </div>
+
+        <div class="field-block">
+            <label>Model</label>
+            <select id="f_model">
+                <?php foreach ($models as $m): ?>
+                    <option value="<?= $m['id'] ?>" <?= $m['id'] == $selected_model_id ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($m['name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div class="field-block">
+            <label>Checker</label>
+            <select id="f_checker">
+                <?php foreach ($checkers as $ch): ?>
+                    <option value="<?= $ch['id'] ?>" <?= $draft && $ch['id'] == $draft['checker_id'] ? 'selected' : '' ?>><?= htmlspecialchars($ch['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div class="field-block">
+            <label>Mark Crank Shaft</label>
+            <input type="text" id="f_mark_crank_shaft" value="<?= htmlspecialchars($draft['mark_crank_shaft'] ?? '') ?>">
+        </div>
+
+        <div class="field-block">
+            <label>Mark Con-rod</label>
+            <input type="text" id="f_mark_conrod" value="<?= htmlspecialchars($draft['mark_conrod'] ?? '') ?>">
+        </div>
+
+        <div class="field-block">
+            <label>Mark FO Pump</label>
+            <input type="text" id="f_mark_fo_pump" value="<?= htmlspecialchars($draft['mark_fo_pump'] ?? '') ?>">
+        </div>
+
+        <div class="field-block">
+            <label>No Cyl Block</label>
+            <input type="text" id="f_no_cyl_block" value="<?= htmlspecialchars($draft['no_cyl_block'] ?? '') ?>">
+        </div>
+
+        <div class="field-block">
+            <label>No Engine</label>
+            <input type="text" id="f_no_engine" value="<?= htmlspecialchars($draft['no_engine'] ?? '') ?>">
+        </div>
+
+        <div class="field-block">
+            <label>Detail Model</label>
+            <input type="text" id="f_detail_model" value="<?= htmlspecialchars($draft['detail_model'] ?? '') ?>">
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table id="assy-table" class="assy-table">
+            <thead>
+                <tr>
+                    <th>Checking Item</th>
+                    <th>Standard</th>
+                    <th>Standard Min.</th>
+                    <th>Standard Max.</th>
+                    <th>Actual Result</th>
+                    <th>Consumable Item</th>
+                </tr>
+            </thead>
+            <tbody id="assy-tbody">
+                <tr><td colspan="6" class="empty">Loading data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="actions">
+        <button type="button" class="btn btn-draft" id="btn-draft">Save as Draft</button>
+        <button type="button" class="btn btn-submit" id="btn-submit">Submit</button>
+    </div>
+</div>
+
+<script>
+    const DEPARTMENT_ID = <?= json_encode($department['id']) ?>;
+    const DRAFT_ID = <?= json_encode($draft_id ?: null) ?>;
+    const DRAFT_VALUES = <?= json_encode($draft_values, JSON_FORCE_OBJECT) ?>;
+</script>
+<script src="assets/js/assy.js"></script>
+<?php require __DIR__ . '/includes/app_bottom.php'; ?>

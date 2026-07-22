@@ -1,0 +1,98 @@
+<?php
+require_once __DIR__ . '/config/db.php';
+$pdo = get_db();
+
+$departments = $pdo->query("SELECT * FROM m_department WHERE form_type = 'assembly' ORDER BY sort_order, id")->fetchAll();
+
+$selected_department_id = (int)($_GET['department_id'] ?? ($_SESSION['department_id'] ?? 0));
+if (!in_array($selected_department_id, array_column($departments, 'id'))) {
+    $selected_department_id = $departments[0]['id'] ?? 0;
+}
+
+$stmt = $pdo->prepare('SELECT * FROM m_assy_model WHERE department_id = ? ORDER BY sort_order, id');
+$stmt->execute([$selected_department_id]);
+$models = $stmt->fetchAll();
+
+$selected_model_id = (int)($_GET['model_id'] ?? 0);
+$date_from = $_GET['date_from'] ?? date('Y-m-d');
+$date_to = $_GET['date_to'] ?? date('Y-m-d');
+
+$where = ["h.status = 'submitted'", 'h.tanggal BETWEEN ? AND ?', 'h.department_id = ?'];
+$params = [$date_from, $date_to, $selected_department_id];
+
+if ($selected_model_id) {
+    $where[] = 'h.model_id = ?';
+    $params[] = $selected_model_id;
+}
+
+$sql = 'SELECT h.*, d.name AS department_name, m.name AS model_name, ck.name AS checker_name
+        FROM t_assy_header h
+        JOIN m_department d ON d.id = h.department_id
+        JOIN m_assy_model m ON m.id = h.model_id
+        JOIN m_checker ck ON ck.id = h.checker_id
+        WHERE ' . implode(' AND ', $where) . '
+        ORDER BY h.tanggal DESC, h.id DESC';
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$results = $stmt->fetchAll();
+
+$base_url = '';
+$active_nav = 'view-checksheets';
+$page_title = 'View Checksheets';
+$page_subtitle = 'Search & view submitted Torque checksheet results';
+require __DIR__ . '/includes/app_top.php';
+?>
+
+<form method="get" class="admin-form filter-bar">
+    <div class="form-grid">
+        <div class="form-row">
+            <label>Date From</label>
+            <input type="date" name="date_from" value="<?= htmlspecialchars($date_from) ?>">
+        </div>
+        <div class="form-row">
+            <label>Date To</label>
+            <input type="date" name="date_to" value="<?= htmlspecialchars($date_to) ?>">
+        </div>
+        <div class="form-row">
+            <label>Department</label>
+            <select name="department_id">
+                <?php foreach ($departments as $d): ?>
+                    <option value="<?= $d['id'] ?>" <?= $d['id'] == $selected_department_id ? 'selected' : '' ?>><?= htmlspecialchars($d['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="form-row">
+            <label>Model</label>
+            <select name="model_id">
+                <option value="0">All Models</option>
+                <?php foreach ($models as $m): ?>
+                    <option value="<?= $m['id'] ?>" <?= $m['id'] == $selected_model_id ? 'selected' : '' ?>><?= htmlspecialchars($m['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+    <div class="form-row">
+        <button type="submit" class="btn">Search</button>
+    </div>
+</form>
+
+<div class="cs-card-list">
+    <?php foreach ($results as $row): ?>
+    <div class="cs-card">
+        <div class="cs-card-date">
+            <div class="cs-card-day"><?= htmlspecialchars(date('d', strtotime($row['tanggal']))) ?></div>
+            <div class="cs-card-month"><?= htmlspecialchars(date('M', strtotime($row['tanggal']))) ?></div>
+        </div>
+        <div class="cs-card-body">
+            <div class="cs-card-title"><?= htmlspecialchars($row['model_name']) ?><?php if ($row['detail_model']): ?> &middot; <?= htmlspecialchars($row['detail_model']) ?><?php endif; ?></div>
+            <div class="cs-card-meta">Checked by <?= htmlspecialchars($row['checker_name']) ?><?php if ($row['no_engine']): ?> &middot; Engine <?= htmlspecialchars($row['no_engine']) ?><?php endif; ?></div>
+        </div>
+        <span class="cs-status cs-status-submitted">Submitted</span>
+        <a href="view_assy_checksheet_detail.php?id=<?= $row['id'] ?>" class="cs-view-btn">View &rarr;</a>
+    </div>
+    <?php endforeach; ?>
+    <?php if (!$results): ?><div class="empty-state">No checksheets found for this date range / filter.</div><?php endif; ?>
+</div>
+
+<?php require __DIR__ . '/includes/app_bottom.php'; ?>

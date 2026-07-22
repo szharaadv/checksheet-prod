@@ -1,0 +1,116 @@
+.alert {
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+.alert-ok { background: #d7f0d7; color: #2a6b2a; }
+.alert-error { background: #f5d7d7; color: #8a2b2b; }
+
+.admin-form {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 18px;
+    margin-bottom: 24px;
+}
+
+.form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.form-row label {
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.form-row input,
+.form-row select {
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0 16px;
+}
+
+.filter-form {
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.filter-form select {
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.table-scroll {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 70vh;
+    border-radius: 6px;
+    border: 1px solid #e6e8ec;
+}
+
+.admin-table {
+    width: 100%;
+    min-width: 480px;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 6px;
+}
+
+.filter-form { flex-wrap: wrap; }
+
+.admin-table th {
+    background: #b8382a;
+    color: #fff;
+    padding: 10px 8px;
+    text-align: center;
+    font-size: 13px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.admin-table td {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 13px;
+    text-align: center;
+}
+
+.admin-table tr:nth-child(odd) td { background: #f9f9f9; }
+
+.row-actions a {
+    margin-right: 10px;
+    color: #b8382a;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.row-actions a.danger { color: #a11; }
+.row-actions a:hover { text-decoration: underline; }
+
+.badge {
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge-ok { background: #d7f0d7; color: #2a6b2a; }
+.badge-off { background: #eee; color: #888; }
+
+.empty { text-align: center; color: #888; padding: 20px; }

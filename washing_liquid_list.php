@@ -1,0 +1,151 @@
+<?php
+require_once __DIR__ . '/config/db.php';
+$pdo = get_db();
+
+if (isset($_GET['department_id'])) {
+    $_SESSION['department_id'] = (int)$_GET['department_id'];
+}
+$department_id = $_SESSION['department_id'] ?? null;
+
+$department = null;
+if ($department_id) {
+    $stmt = $pdo->prepare(
+        "SELECT d.* FROM m_department d
+         JOIN m_checksheet_section s ON s.department_id = d.id
+         WHERE d.id = ? AND d.is_active = 1 AND s.route = 'washing_liquid_list.php' AND s.is_active = 1"
+    );
+    $stmt->execute([$department_id]);
+    $department = $stmt->fetch();
+}
+
+if (!$department) {
+    header('Location: index.php');
+    exit;
+}
+
+$_SESSION['section_route'] = 'washing_liquid_list.php';
+
+$stmt = $pdo->prepare("SELECT * FROM m_checker WHERE department_id = ? AND is_active = 1 AND role = 'foreman' ORDER BY name");
+$stmt->execute([$department['id']]);
+$foremen = $stmt->fetchAll();
+
+$stmt = $pdo->prepare("SELECT * FROM m_checker WHERE department_id = ? AND is_active = 1 AND role = 'supervisor' ORDER BY name");
+$stmt->execute([$department['id']]);
+$supervisors = $stmt->fetchAll();
+
+$month = (int)($_GET['month'] ?? date('n'));
+$year = (int)($_GET['year'] ?? date('Y'));
+$month = max(1, min(12, $month));
+$daysInMonth = (int)date('t', mktime(0, 0, 0, $month, 1, $year));
+
+$stmt = $pdo->prepare(
+    'SELECT * FROM t_washing_entry WHERE department_id = ? AND tanggal BETWEEN ? AND ?'
+);
+$monthStart = sprintf('%04d-%02d-01', $year, $month);
+$monthEnd = sprintf('%04d-%02d-%02d', $year, $month, $daysInMonth);
+$stmt->execute([$department['id'], $monthStart, $monthEnd]);
+$entries = [];
+foreach ($stmt->fetchAll() as $e) {
+    $entries[(int)date('j', strtotime($e['tanggal']))] = $e;
+}
+
+$base_url = '';
+$active_nav = 'checksheet';
+$page_title = 'Production Check Sheet - Washing Machine Liquid Monitoring';
+$page_subtitle = $department['name'] . ' · Monthly log';
+require __DIR__ . '/includes/app_top.php';
+?>
+
+<div class="checksheet-card">
+    <div class="dept-context">
+        <span class="dept-context-label">Department:</span>
+        <span class="dept-context-name"><?= htmlspecialchars($department['name']) ?></span>
+        <a href="select_section.php?department_id=<?= $department['id'] ?>" class="dept-switch-link">Change Section</a>
+        <a href="index.php" class="dept-switch-link">Change Department</a>
+    </div>
+
+    <form method="get" class="form-grid-top" style="margin-bottom:14px;">
+        <input type="hidden" name="department_id" value="<?= $department['id'] ?>">
+        <div class="field-block">
+            <label>Month</label>
+            <select name="month" onchange="this.form.submit()">
+                <?php
+                $monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+                foreach ($monthNames as $i => $mName): ?>
+                    <option value="<?= $i + 1 ?>" <?= ($i + 1) == $month ? 'selected' : '' ?>><?= $mName ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="field-block">
+            <label>Year</label>
+            <select name="year" onchange="this.form.submit()">
+                <?php for ($y = date('Y') - 2; $y <= date('Y') + 1; $y++): ?>
+                    <option value="<?= $y ?>" <?= $y == $year ? 'selected' : '' ?>><?= $y ?></option>
+                <?php endfor; ?>
+            </select>
+        </div>
+    </form>
+
+    <div class="table-wrap">
+        <table id="washing-table" class="washing-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Ganti Air (Kuras)<br><small>YM08 = min 30 ltr</small></th>
+                    <th>Temperatur Air (&deg;C)<br><small>std. 50 - 60 &deg;C</small></th>
+                    <th>Penambahan Gildaon YM08<br><small>0.5 poin = 4 ltr</small></th>
+                    <th>Total Acid<br><small>(3 - 4 point)</small></th>
+                    <th>Checker<br><small>Foreman</small></th>
+                    <th>Control<br><small>Supervisor</small></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                $today = date('Y-m-d');
+                for ($day = 1; $day <= $daysInMonth; $day++):
+                    $e = $entries[$day] ?? null;
+                    $rowDate = sprintf('%04d-%02d-%02d', $year, $month, $day);
+                    $isLocked = $rowDate < $today;
+                    $dis = $isLocked ? 'disabled' : '';
+                ?>
+                <tr class="<?= $isLocked ? 'row-locked' : '' ?>">
+                    <td><?= $day ?><?php if ($isLocked): ?> <span class="lock-icon" title="Locked, date has passed">&#128274;</span><?php endif; ?></td>
+                    <td><input type="text" class="w-input" data-day="<?= $day ?>" data-field="ganti_air" value="<?= htmlspecialchars($e['ganti_air'] ?? '') ?>" <?= $dis ?>></td>
+                    <td><input type="text" class="w-input" data-day="<?= $day ?>" data-field="temperatur_air" value="<?= htmlspecialchars($e['temperatur_air'] ?? '') ?>" <?= $dis ?>></td>
+                    <td><input type="text" class="w-input" data-day="<?= $day ?>" data-field="penambahan_gildaon" value="<?= htmlspecialchars($e['penambahan_gildaon'] ?? '') ?>" <?= $dis ?>></td>
+                    <td><input type="text" class="w-input" data-day="<?= $day ?>" data-field="total_acid" value="<?= htmlspecialchars($e['total_acid'] ?? '') ?>" <?= $dis ?>></td>
+                    <td>
+                        <select class="w-select" data-day="<?= $day ?>" data-field="checker_id" <?= $dis ?>>
+                            <option value="">-</option>
+                            <?php foreach ($foremen as $c): ?>
+                                <option value="<?= $c['id'] ?>" <?= ($e['checker_id'] ?? null) == $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </td>
+                    <td>
+                        <select class="w-select" data-day="<?= $day ?>" data-field="supervisor_id" <?= $dis ?>>
+                            <option value="">-</option>
+                            <?php foreach ($supervisors as $c): ?>
+                                <option value="<?= $c['id'] ?>" <?= ($e['supervisor_id'] ?? null) == $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </td>
+                </tr>
+                <?php endfor; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="actions">
+        <button type="button" class="btn btn-submit" id="btn-submit">Save Entries</button>
+    </div>
+</div>
+
+<script>
+    const DEPARTMENT_ID = <?= json_encode($department['id']) ?>;
+    const MONTH = <?= json_encode($month) ?>;
+    const YEAR = <?= json_encode($year) ?>;
+    const DAYS_IN_MONTH = <?= json_encode($daysInMonth) ?>;
+</script>
+<script src="assets/js/washing.js"></script>
+<?php require __DIR__ . '/includes/app_bottom.php'; ?>
