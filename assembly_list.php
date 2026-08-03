@@ -53,17 +53,12 @@ $base_url = '';
 $active_nav = 'checksheet';
 $page_title = 'Production Check Sheet - Daily Torque';
 $page_subtitle = $department['name'] . ' · Fill daily production record';
+require_once __DIR__ . '/includes/breadcrumb.php';
+$breadcrumb = build_checksheet_breadcrumb($pdo, $department, 'assembly_list.php');
 require __DIR__ . '/includes/app_top.php';
 ?>
 
 <div class="checksheet-card">
-    <div class="dept-context">
-        <span class="dept-context-label">Department:</span>
-        <span class="dept-context-name"><?= htmlspecialchars($department['name']) ?></span>
-        <a href="select_section.php?department_id=<?= $department['id'] ?>" class="dept-switch-link">Change Section</a>
-        <a href="index.php" class="dept-switch-link">Change Department</a>
-    </div>
-
     <div class="form-grid-top">
         <div class="field-block">
             <label>Date</label>

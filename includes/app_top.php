@@ -36,7 +36,14 @@ $page_subtitle = $page_subtitle ?? '';
                 </button>
                 <div>
                     <h1><?= htmlspecialchars($page_title) ?></h1>
-                    <?php if ($page_subtitle): ?><p><?= htmlspecialchars($page_subtitle) ?></p><?php endif; ?>
+                    <?php if (!empty($breadcrumb)): ?>
+                        <nav class="topbar-breadcrumb">
+                            <?php foreach ($breadcrumb as $i => $crumb): ?>
+                                <?php if ($i > 0): ?><span class="crumb-sep">&rsaquo;</span><?php endif; ?>
+                                <a class="crumb" href="<?= $base_url . $crumb['href'] ?>" title="<?= htmlspecialchars($crumb['title'] ?? '') ?>"><?= htmlspecialchars($crumb['label']) ?></a>
+                            <?php endforeach; ?>
+                        </nav>
+                    <?php elseif ($page_subtitle): ?><p><?= htmlspecialchars($page_subtitle) ?></p><?php endif; ?>
                 </div>
             </div>
             <div class="topbar-date"><?= date('D, d M Y') ?></div>

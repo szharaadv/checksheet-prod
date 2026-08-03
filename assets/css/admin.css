@@ -114,3 +114,95 @@
 .badge-off { background: #eee; color: #888; }
 
 .empty { text-align: center; color: #888; padding: 20px; }
+
+/* ---- Role Permissions matrix ---- */
+.section-head { margin-bottom: 16px; }
+.section-head h2 { margin: 0 0 4px; font-size: 20px; }
+.section-head p { margin: 0; color: #777; font-size: 14px; }
+
+.matrix-card {
+    background: #fff;
+    border: 1px solid #e6e8ec;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.matrix-card-head {
+    padding: 12px 16px;
+    font-weight: 700;
+    font-size: 14px;
+    border-bottom: 1px solid #eee;
+    background: #fafafa;
+}
+
+.matrix-card .table-scroll { border: 0; border-radius: 0; max-height: none; }
+
+.perm-matrix {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    background: #fff;
+    font-size: 14px;
+}
+
+.perm-matrix th {
+    background: #fafafa;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-size: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.perm-matrix th.perm-col { text-align: left; }
+.perm-matrix th.role-col { text-align: center; width: 130px; }
+
+.perm-matrix td {
+    padding: 12px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+}
+
+.perm-matrix td.perm-col { text-align: left; }
+.perm-matrix td.role-col { text-align: center; }
+
+.perm-matrix .perm-label { font-weight: 600; color: #222; }
+.perm-matrix .perm-key { color: #999; font-size: 12px; }
+
+.perm-matrix .group-row td {
+    background: #f5f6f8;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #888;
+    padding: 8px 12px;
+}
+
+.perm-matrix input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #b8382a;
+    cursor: pointer;
+}
+.perm-matrix input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .55; }
+
+.role-chip {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+}
+.role-superadmin { background: #f3d9d5; color: #8a2b2b; }
+.role-admin      { background: #fde6c9; color: #8a6a15; }
+.role-user       { background: #fdf3c9; color: #7a6a12; }
+
+.matrix-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+}

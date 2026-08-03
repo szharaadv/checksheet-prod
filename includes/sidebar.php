@@ -9,6 +9,9 @@ $base_url = $base_url ?? '';
 $active_nav = $active_nav ?? '';
 $config_active = str_starts_with($active_nav, 'config-');
 
+require_once __DIR__ . '/auth.php';
+$me = current_user();
+
 $pdo = get_db();
 
 $session_department_type = 'checklist';
@@ -76,12 +79,6 @@ function icon(string $name): string
             <?= icon('edit') ?> My Drafts
             <?php if (!$is_washing_section && $draft_count > 0): ?><span class="nav-badge"><?= $draft_count ?></span><?php endif; ?>
         </a>
-        <a class="nav-item disabled" href="<?= $base_url ?>soon.php?feature=Approvals">
-            <?= icon('check') ?> Approvals
-        </a>
-        <a class="nav-item disabled" href="<?= $base_url ?>soon.php?feature=KPI+Dashboard">
-            <?= icon('chart') ?> KPI Dashboard
-        </a>
 
         <div class="nav-group-label">Master Data</div>
         <div class="nav-item nav-parent <?= $config_active ? 'active' : '' ?>" id="config-toggle">
@@ -107,10 +104,30 @@ function icon(string $name): string
         <a class="nav-item disabled" href="<?= $base_url ?>soon.php?feature=Users">
             <?= icon('user') ?> Users
         </a>
+        <a class="nav-item <?= $active_nav === 'config-roles' ? 'active' : '' ?>" href="<?= $base_url ?>admin/role_permissions.php">
+            <?= icon('gear') ?> Role Permissions
+        </a>
         <a class="nav-item disabled" href="<?= $base_url ?>soon.php?feature=Audit+Log">
             <?= icon('list') ?> Audit Log
         </a>
     </nav>
+
+    <?php if ($me): ?>
+    <div class="sidebar-user">
+        <div class="user-avatar">
+            <?php if (!empty($me['avatar'])): ?>
+                <img src="<?= htmlspecialchars($me['avatar']) ?>" alt="">
+            <?php else: ?>
+                <span><?= htmlspecialchars(user_initials($me['name'])) ?></span>
+            <?php endif; ?>
+        </div>
+        <div class="user-meta">
+            <div class="user-name" title="<?= htmlspecialchars($me['name']) ?>"><?= htmlspecialchars($me['name']) ?></div>
+            <div class="user-role"><?= htmlspecialchars($me['role']) ?></div>
+        </div>
+        <a class="user-logout" href="<?= $base_url ?>logout.php">Logout</a>
+    </div>
+    <?php endif; ?>
 </aside>
 <script>
 document.getElementById('config-toggle').addEventListener('click', function () {
