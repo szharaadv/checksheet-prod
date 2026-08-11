@@ -36,11 +36,16 @@ $sectionViewMap = [
     'painting_list.php'       => 'view_checksheets.php',
     'assembly_list.php'       => 'view_assy_checksheets.php',
     'washing_liquid_list.php' => 'view_washing_checksheets.php',
+    'subassy_list.php'        => 'view_subassy_checksheets.php',
 ];
 $view_href = $base_url . ($sectionViewMap[$_SESSION['section_route'] ?? ''] ?? ($is_assy_context ? 'view_assy_checksheets.php' : 'view_checksheets.php'));
-$is_washing_section = ($_SESSION['section_route'] ?? '') === 'washing_liquid_list.php';
-$drafts_href = $base_url . ($is_washing_section
-    ? 'soon.php?feature=My+Drafts+(not+applicable+to+Washing+Machine+Liquid+Monitoring)'
+$current_route = $_SESSION['section_route'] ?? '';
+$is_washing_section = $current_route === 'washing_liquid_list.php';
+// Monthly-log sections (Washing, Sub Assembly) share the same UX:
+// no per-sheet drafts, and only the "Checked By" master data applies.
+$is_monthly_monitor = in_array($current_route, ['washing_liquid_list.php', 'subassy_list.php'], true);
+$drafts_href = $base_url . ($is_monthly_monitor
+    ? 'soon.php?feature=My+Drafts+(not+applicable+to+this+check+sheet)'
     : ($is_assy_context ? 'my_assy_drafts.php' : 'my_drafts.php'));
 
 function icon(string $name): string
@@ -75,9 +80,9 @@ function icon(string $name): string
         <a class="nav-item <?= $active_nav === 'view-checksheets' ? 'active' : '' ?>" href="<?= $view_href ?>">
             <?= icon('folder') ?> View Checksheets
         </a>
-        <a class="nav-item <?= $is_washing_section ? 'disabled' : ($active_nav === 'my-drafts' ? 'active' : '') ?>" href="<?= $drafts_href ?>">
+        <a class="nav-item <?= $is_monthly_monitor ? 'disabled' : ($active_nav === 'my-drafts' ? 'active' : '') ?>" href="<?= $drafts_href ?>">
             <?= icon('edit') ?> My Drafts
-            <?php if (!$is_washing_section && $draft_count > 0): ?><span class="nav-badge"><?= $draft_count ?></span><?php endif; ?>
+            <?php if (!$is_monthly_monitor && $draft_count > 0): ?><span class="nav-badge"><?= $draft_count ?></span><?php endif; ?>
         </a>
 
         <div class="nav-group-label">Master Data</div>
@@ -86,7 +91,7 @@ function icon(string $name): string
             <span class="nav-chevron">&#8250;</span>
         </div>
         <div class="nav-submenu <?= $config_active ? 'open' : '' ?>" id="config-submenu">
-            <?php if ($is_washing_section): ?>
+            <?php if ($is_monthly_monitor): ?>
                 <a class="nav-subitem <?= $active_nav === 'config-checker' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checkers.php">Checked By</a>
             <?php elseif ($is_assy_context): ?>
                 <a class="nav-subitem <?= $active_nav === 'config-assy-model' ? 'active' : '' ?>" href="<?= $base_url ?>admin/assy_models.php">Model</a>
