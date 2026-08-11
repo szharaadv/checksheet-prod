@@ -100,11 +100,11 @@ require __DIR__ . '/includes/app_top.php';
                 for ($day = 1; $day <= $daysInMonth; $day++):
                     $e = $entries[$day] ?? null;
                     $rowDate = sprintf('%04d-%02d-%02d', $year, $month, $day);
-                    $isLocked = $rowDate < $today;
+                    $isLocked = $rowDate > $today;
                     $dis = $isLocked ? 'disabled' : '';
                 ?>
                 <tr class="<?= $isLocked ? 'row-locked' : '' ?>">
-                    <td><?= $day ?><?php if ($isLocked): ?> <span class="lock-icon" title="Locked, date has passed">&#128274;</span><?php endif; ?></td>
+                    <td><?= $day ?><?php if ($isLocked): ?> <span class="lock-icon" title="Locked, future date">&#128274;</span><?php endif; ?></td>
                     <td><input type="text" class="w-input" data-day="<?= $day ?>" data-field="ganti_air" value="<?= htmlspecialchars($e['ganti_air'] ?? '') ?>" <?= $dis ?>></td>
                     <td><input type="text" class="w-input" data-day="<?= $day ?>" data-field="temperatur_air" value="<?= htmlspecialchars($e['temperatur_air'] ?? '') ?>" <?= $dis ?>></td>
                     <td><input type="text" class="w-input" data-day="<?= $day ?>" data-field="penambahan_gildaon" value="<?= htmlspecialchars($e['penambahan_gildaon'] ?? '') ?>" <?= $dis ?>></td>

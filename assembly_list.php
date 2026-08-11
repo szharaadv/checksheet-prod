@@ -62,7 +62,7 @@ require __DIR__ . '/includes/app_top.php';
     <div class="form-grid-top">
         <div class="field-block">
             <label>Date</label>
-            <input type="date" id="f_tanggal" value="<?= htmlspecialchars($draft['tanggal'] ?? date('Y-m-d')) ?>" readonly>
+            <input type="date" id="f_tanggal" value="<?= htmlspecialchars($draft['tanggal'] ?? date('Y-m-d')) ?>" max="<?= date('Y-m-d') ?>">
         </div>
 
         <div class="field-block">

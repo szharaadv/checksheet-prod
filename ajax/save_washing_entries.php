@@ -40,7 +40,7 @@ try {
             continue;
         }
         $tanggal = sprintf('%04d-%02d-%02d', $year, $month, $day);
-        if ($tanggal < $today) {
+        if ($tanggal > $today) {
             continue;
         }
         $stmt->execute([
