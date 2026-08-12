@@ -66,9 +66,7 @@ require __DIR__ . '/includes/app_top.php';
 ?>
 
 <div class="checksheet-card">
-    <p style="margin:0 0 12px;color:#6b7280;font-size:13px;font-weight:600;">
-        JIG FOR GUIDEN ASSEMBLY OIL SEAL STARTING SHAFT &middot; V = OK, X = NG
-    </p>
+    <?php require_once __DIR__ . '/includes/check_guide.php'; render_check_guide($pdo, 'subassy_list.php'); ?>
     <form method="get" class="form-grid-top" style="margin-bottom:14px;">
         <input type="hidden" name="department_id" value="<?= $department['id'] ?>">
         <div class="field-block">

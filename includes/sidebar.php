@@ -37,13 +37,14 @@ $sectionViewMap = [
     'assembly_list.php'       => 'view_assy_checksheets.php',
     'washing_liquid_list.php' => 'view_washing_checksheets.php',
     'subassy_list.php'        => 'view_subassy_checksheets.php',
+    'fopump_list.php'         => 'view_fopump_checksheets.php',
 ];
 $view_href = $base_url . ($sectionViewMap[$_SESSION['section_route'] ?? ''] ?? ($is_assy_context ? 'view_assy_checksheets.php' : 'view_checksheets.php'));
 $current_route = $_SESSION['section_route'] ?? '';
 $is_washing_section = $current_route === 'washing_liquid_list.php';
 // Monthly-log sections (Washing, Sub Assembly) share the same UX:
 // no per-sheet drafts, and only the "Checked By" master data applies.
-$is_monthly_monitor = in_array($current_route, ['washing_liquid_list.php', 'subassy_list.php'], true);
+$is_monthly_monitor = in_array($current_route, ['washing_liquid_list.php', 'subassy_list.php', 'fopump_list.php'], true);
 $drafts_href = $base_url . ($is_monthly_monitor
     ? 'soon.php?feature=My+Drafts+(not+applicable+to+this+check+sheet)'
     : ($is_assy_context ? 'my_assy_drafts.php' : 'my_drafts.php'));
@@ -93,6 +94,7 @@ function icon(string $name): string
         <div class="nav-submenu <?= $config_active ? 'open' : '' ?>" id="config-submenu">
             <?php if ($is_monthly_monitor): ?>
                 <a class="nav-subitem <?= $active_nav === 'config-checker' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checkers.php">Checked By</a>
+                <a class="nav-subitem <?= $active_nav === 'config-guide' ? 'active' : '' ?>" href="<?= $base_url ?>admin/check_guides.php">Checking Guide</a>
             <?php elseif ($is_assy_context): ?>
                 <a class="nav-subitem <?= $active_nav === 'config-assy-model' ? 'active' : '' ?>" href="<?= $base_url ?>admin/assy_models.php">Model</a>
                 <a class="nav-subitem <?= $active_nav === 'config-assy-checklist' ? 'active' : '' ?>" href="<?= $base_url ?>admin/assy_checklist_items.php">Checking Item</a>
@@ -111,6 +113,9 @@ function icon(string $name): string
         </a>
         <a class="nav-item <?= $active_nav === 'config-roles' ? 'active' : '' ?>" href="<?= $base_url ?>admin/role_permissions.php">
             <?= icon('gear') ?> Role Permissions
+        </a>
+        <a class="nav-item <?= $active_nav === 'config-import' ? 'active' : '' ?>" href="<?= $base_url ?>admin/import_data.php">
+            <?= icon('doc') ?> Import Data
         </a>
         <a class="nav-item disabled" href="<?= $base_url ?>soon.php?feature=Audit+Log">
             <?= icon('list') ?> Audit Log

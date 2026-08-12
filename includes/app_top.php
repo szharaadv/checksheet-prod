@@ -19,9 +19,16 @@ $page_subtitle = $page_subtitle ?? '';
     <title><?= htmlspecialchars($page_title ?: 'Check Sheet') ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= $base_url ?>assets/css/app.css">
-    <link rel="stylesheet" href="<?= $base_url ?>assets/css/style.css">
-    <link rel="stylesheet" href="<?= $base_url ?>assets/css/admin.css">
+    <?php
+    // Cache-busting: append each stylesheet's last-modified time so browsers
+    // always fetch the latest version after a CSS change.
+    $cssFiles = ['app.css', 'style.css', 'admin.css'];
+    foreach ($cssFiles as $cssFile):
+        $cssPath = __DIR__ . '/../assets/css/' . $cssFile;
+        $ver = is_file($cssPath) ? filemtime($cssPath) : '1';
+    ?>
+    <link rel="stylesheet" href="<?= $base_url ?>assets/css/<?= $cssFile ?>?v=<?= $ver ?>">
+    <?php endforeach; ?>
 </head>
 <body>
 <div class="app-shell">
