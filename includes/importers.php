@@ -17,6 +17,10 @@ function import_registry(): array
             'note'     => 'One row per date. checker = Foreman name, control = Supervisor name (must match Checked By master).',
             'fn'       => 'import_washing',
             'export'   => 'export_washing',
+            'groups'   => [
+                ['label' => 'One row per date (matches the check sheet form)',
+                 'cols'  => ['tanggal', 'ganti_air', 'temperatur_air', 'penambahan_gildaon', 'total_acid', 'checker', 'control']],
+            ],
         ],
         'subassy_list.php' => [
             'label'    => 'Sub Assembly',
@@ -24,13 +28,19 @@ function import_registry(): array
             'note'     => 'One row per date. Check columns accept OK / NG (also V / X). checker = Foreman, control = Supervisor.',
             'fn'       => 'import_subassy',
             'export'   => 'export_subassy',
+            'groups'   => [
+                ['label' => 'One row per date (matches the check sheet form)',
+                 'cols'  => ['tanggal', 'surface_outside', 'parting_line', 'surface_upper', 'cleanliness', 'checker', 'control']],
+            ],
         ],
         'fopump_list.php' => [
             'label'    => 'FO Pump Assy',
-            // Columns mirror the F-FIP-03 form. One CSV row = one production
-            // line (NO 1..9); Date/Employee/Shift/signatures/Convert/Acumulation
-            // repeat on each row of the same date. Total columns are computed by
-            // the system (ignored on import, filled on export).
+            // Columns mirror the F-FIP-03 form / the on-screen check sheet
+            // (fopump_list.php). One CSV row = one production line (NO 1..9);
+            // Date/Employee/Shift/signatures/Convert/Acumulation repeat on
+            // each row of the same date. Total is a read-only, auto-summed
+            // field on the form (not stored) — it's excluded from the fillable
+            // template and only appears when exporting existing data.
             'template' => ['Date', 'Employee', 'Working Time', 'Shift', 'NO',
                            'FO Pump Production Model', 'FO Pump Production Quantity',
                            'To Assembly Line Model', 'To Assembly Line Quantity',
@@ -39,12 +49,29 @@ function import_registry(): array
                            'Convert Production', 'Convert Assembly', 'Convert Export',
                            'Acumulation Production', 'Acumulation Assembly', 'Acumulation Export',
                            'Operator', 'Foreman', 'Supervisor'],
-            'note'     => 'One row per production line (NO 1..9). Rows with the same Date form one report; Date/Employee/Shift/Convert/Acumulation/signatures repeat on each. Total columns are auto-computed (ignored on import). You can also upload the original F-FIP-03 .xlsx report(s) directly (one or many files, each with one or many month sheets) — no re-typing needed.',
+            'note'     => 'One row per production line (NO 1..9). Rows with the same Date form one report; Date/Employee/Shift/Convert/Acumulation/signatures repeat on each. Foreman/Supervisor must match an existing name in Checked By master data (Foreman/Supervisor role) — the form uses a dropdown, not free text. Total is auto-computed by the form and not saved, so it is left out of the fillable template. You can also upload the original F-FIP-03 .xlsx report(s) directly (one or many files, each with one or many month sheets) — no re-typing needed.',
             'fn'       => 'import_fopump',
             'normalize'    => 'fopump_normalize_csv_rows',
             'core'         => 'import_fopump_rows',
             'xlsx_extract' => 'fopump_extract_from_xlsx',
+            'xlsx_template' => 'fopump_build_template_xlsx',
             'export'   => 'export_fopump',
+            'groups'   => [
+                ['label' => 'Header — repeat on every row of the same Date',
+                 'cols'  => ['Date', 'Employee', 'Working Time', 'Shift']],
+                ['label' => 'Production line detail — one row per NO (1-9)',
+                 'cols'  => ['NO', 'FO Pump Production Model', 'FO Pump Production Quantity',
+                             'To Assembly Line Model', 'To Assembly Line Quantity',
+                             'To Export YSP Model', 'To Export YSP Quantity']],
+                ['label' => 'Convert & Acumulation — fill once per Date (repeat on every row)',
+                 'cols'  => ['Convert Production', 'Convert Assembly', 'Convert Export',
+                             'Acumulation Production', 'Acumulation Assembly', 'Acumulation Export']],
+                ['label' => 'Signatures — fill once per Date (repeat on every row)',
+                 'cols'  => ['Operator', 'Foreman', 'Supervisor']],
+                ['label' => 'Auto-computed by the form — leave blank, only shown when exporting',
+                 'cols'  => ['Total Production', 'Total Assembly', 'Total Export'],
+                 'readonly' => true],
+            ],
         ],
         'assembly_list.php' => [
             'label'    => 'Torque (Daily Torque)',
@@ -53,19 +80,53 @@ function import_registry(): array
             'note'     => 'One row per checking item. Rows with the same tanggal + model form one sheet; header fields repeat. checking_item must match the Checking Item master for that model.',
             'fn'       => 'import_torque',
             'export'   => 'export_torque',
+            'groups'   => [
+                ['label' => 'Header — repeat on every row of the same tanggal + model',
+                 'cols'  => ['tanggal', 'model', 'checker', 'mark_crank_shaft', 'mark_conrod', 'mark_fo_pump',
+                             'no_cyl_block', 'no_engine', 'detail_model']],
+                ['label' => 'Checklist detail — one row per checking item',
+                 'cols'  => ['checking_item', 'actual_result', 'consumable_item']],
+            ],
         ],
         'painting_list.php' => [
             'label'    => 'Painting Checklist',
             // Columns match the PowerApps export layout. Descriptive columns
             // (Metode Pengecekkan, Standard Min./Max., Satuan, Tank/Tube) come
-            // from master data — ignored on import, filled on export.
+            // from master data, aren't editable on the check sheet form — ignored
+            // on import, only filled in when exporting existing data.
             'template' => ['Condition', 'Date', 'Checking Item', 'Metode Pengecekkan', 'Standard Min.', 'Standard Max.',
                            'Satuan', 'Shift', 'Jam', 'Tank/Tube', 'Actual Result', 'Category', 'Checked By :'],
-            'note'     => 'One row per checking item. Rows with the same Date + Condition + Jam form one sheet; header fields repeat. Condition / Checking Item must match master data. Descriptive columns (Metode, Standard, Satuan, Tank/Tube) are ignored on import.',
+            'note'     => 'One row per checking item. Rows with the same Date + Condition + Jam form one sheet; header fields repeat. Condition / Checking Item must match master data. Descriptive columns (Metode, Standard, Satuan, Tank/Tube) come from master data and are not on the fillable template — they only appear when exporting existing data.',
             'fn'       => 'import_painting',
             'export'   => 'export_painting',
+            'groups'   => [
+                ['label' => 'Header — repeat on every row of the same Date + Condition + Jam',
+                 'cols'  => ['Condition', 'Date', 'Shift', 'Jam', 'Checked By :']],
+                ['label' => 'Checklist detail — one row per checking item',
+                 'cols'  => ['Checking Item', 'Actual Result', 'Category']],
+                ['label' => 'Reference from master data — leave blank, only shown when exporting',
+                 'cols'  => ['Metode Pengecekkan', 'Standard Min.', 'Standard Max.', 'Satuan', 'Tank/Tube'],
+                 'readonly' => true],
+            ],
         ],
     ];
+}
+
+/** Columns marked readonly in a section's groups (reference/computed — excluded from the fillable template). */
+function import_readonly_cols(array $cfg): array
+{
+    $cols = [];
+    foreach ($cfg['groups'] ?? [] as $g) {
+        if (!empty($g['readonly'])) $cols = array_merge($cols, $g['cols']);
+    }
+    return $cols;
+}
+
+/** The columns a user should actually fill in the downloadable template (full template minus readonly/reference columns). */
+function import_fillable_cols(array $cfg): array
+{
+    $ro = import_readonly_cols($cfg);
+    return array_values(array_filter($cfg['template'], fn($c) => !in_array($c, $ro, true)));
 }
 
 /** Group rows by a composite key built from the given columns. Preserves order. */
@@ -301,6 +362,14 @@ function fopump_extract_from_xlsx(string $path): array
             $base['accum_prod'] = $accumRow['C'] ?? '';
             $base['accum_assy'] = $accumRow['E'] ?? '';
             $base['accum_export'] = $accumRow['G'] ?? '';
+            // Operator/Foreman/Supervisor row (labels at anchor+14, values at
+            // anchor+15 in our own generated template — see fopump_build_template_xlsx()).
+            // On the original printed F-FIP-03 these are hand-signed images, so
+            // real scanned files simply have no text here and this stays blank.
+            $opRow = $cells[$anchor + 15] ?? [];
+            $base['operator'] = $opRow['B'] ?? '';
+            $base['foreman'] = $opRow['D'] ?? '';
+            $base['supervisor'] = $opRow['F'] ?? '';
 
             $any = false;
             for ($no = 1; $no <= 9; $no++) {
@@ -321,14 +390,120 @@ function fopump_extract_from_xlsx(string $path): array
                 $rows[] = $line;
                 $any = true;
             }
-            // Date with no filled lines at all still needs a row so the header gets saved.
             if (!$any) {
-                $rows[] = array_merge($base, ['row_no' => '1', 'prod_model' => '', 'prod_qty' => '',
-                    'assy_model' => '', 'assy_qty' => '', 'export_model' => '', 'export_qty' => '']);
+                // No production lines for this date. If nothing else was filled in
+                // either (employee/shift/signatures/convert — e.g. a blank Sat/Sun
+                // block left untouched in the template), skip the date entirely
+                // rather than importing an empty report. Acumulation/Total are
+                // excluded from this check since they're auto-computed formulas
+                // that carry a value forward even on a day nothing was typed.
+                $hasOtherData = false;
+                foreach (['employee', 'working_time', 'shift', 'operator', 'foreman', 'supervisor',
+                          'convert_prod', 'convert_assy', 'convert_export'] as $k) {
+                    if (trim((string) ($base[$k] ?? '')) !== '') { $hasOtherData = true; break; }
+                }
+                if ($hasOtherData) {
+                    $rows[] = array_merge($base, ['row_no' => '1', 'prod_model' => '', 'prod_qty' => '',
+                        'assy_model' => '', 'assy_qty' => '', 'export_model' => '', 'export_qty' => '']);
+                }
             }
         }
     }
     return $rows;
+}
+
+/**
+ * Build a blank .xlsx template that mirrors the printed F-FIP-03 block layout
+ * (Date/Employee/Working Time row, NO 1-9 table grouped by Model/Quantity,
+ * Total/Convert/Acumulation rows, Operator/Foreman/Supervisor row) instead of
+ * one wide flat row per line — this is what fopump_extract_from_xlsx() reads
+ * back in, so "download, fill in Excel exactly like the paper form, upload"
+ * round-trips cleanly.
+ *
+ * One block is generated per calendar day of the given month (1 .. last day,
+ * per the real $year/$month calendar — e.g. 28/29/30/31 as appropriate), with
+ * the Date cell already filled in, so the user only has to type production
+ * data, not build the block structure or work out dates themselves.
+ */
+function fopump_build_template_xlsx(?int $year = null, ?int $month = null): string
+{
+    $year = $year ?: (int) date('Y');
+    $month = $month ?: (int) date('n');
+    $month = max(1, min(12, $month));
+    $daysInMonth = (int) date('t', mktime(0, 0, 0, $month, 1, $year));
+    $monthLabel = date('F Y', mktime(0, 0, 0, $month, 1, $year));
+
+    $rows = [];
+    $B = fn($v) => ['v' => $v, 'b' => true];
+    $N = fn($v = '') => ['v' => $v];
+
+    $rows[1] = ['A' => $B("Daily Report - FO Pump Assy — $monthLabel"),
+                'D' => $N("One block per day (1-$daysInMonth), Date pre-filled to the $year calendar. Total = SUM of that day's Quantity; Acumulation = previous day's Acumulation + that day's Total.")];
+
+    $merges = [];
+    $blockHeight = 18; // rows anchor-1 .. anchor+15, plus one blank spacer row
+    $anchor1 = 3;
+
+    for ($day = 1; $day <= $daysInMonth; $day++) {
+        $anchor = $anchor1 + ($day - 1) * $blockHeight;
+        $tanggal = sprintf('%04d-%02d-%02d', $year, $month, $day);
+
+        // Date / Employee / Working Time — read from row (anchor-1): B=date, D=employee, F=working time.
+        $rows[$anchor - 1] = [
+            'A' => $B('Date :'), 'B' => $N($tanggal),
+            'C' => $B('Employee:'), 'D' => $N(''),
+            'E' => $B('Working Time:'), 'F' => $N(''),
+        ];
+        // Anchor row: A=NO, B:C="FO PUMP PRODUCTION", D:E="TO ASSEMBLY LINE", F:G="TO EXPORT YSP".
+        $rows[$anchor] = [
+            'A' => $B('NO'), 'B' => $B('FO PUMP PRODUCTION'), 'D' => $B('TO ASSEMBLY LINE'), 'F' => $B('TO EXPORT YSP'),
+        ];
+        $rows[$anchor + 1] = [
+            'B' => $B('Model'), 'C' => $B('Quantity'), 'D' => $B('Model'), 'E' => $B('Quantity'), 'F' => $B('Model'), 'G' => $B('Quantity'),
+        ];
+        for ($no = 1; $no <= 9; $no++) {
+            $r = $anchor + 1 + $no;
+            $rows[$r] = ['A' => $N((string) $no), 'B' => $N(''), 'C' => $N(''), 'D' => $N(''), 'E' => $N(''), 'F' => $N(''), 'G' => $N('')];
+        }
+        // Total — auto-summed from the 9 Quantity cells of this block (C/E/G rows anchor+2..anchor+10).
+        $qtyFirst = $anchor + 2;
+        $qtyLast = $anchor + 10;
+        $totalRow = $anchor + 11;
+        $accumRow = $anchor + 13;
+        $rows[$totalRow] = [
+            'A' => $B('Total'),
+            'C' => ['f' => "SUM(C$qtyFirst:C$qtyLast)"],
+            'E' => ['f' => "SUM(E$qtyFirst:E$qtyLast)"],
+            'G' => ['f' => "SUM(G$qtyFirst:G$qtyLast)"],
+        ];
+        $rows[$anchor + 12] = ['A' => $B('Convert'), 'C' => $N(''), 'E' => $N(''), 'G' => $N('')];
+        // Acumulation — running total: previous day's Acumulation + this day's Total (first block has no previous day).
+        if ($day === 1) {
+            $rows[$accumRow] = [
+                'A' => $B('Acumulation'),
+                'C' => ['f' => "C$totalRow"], 'E' => ['f' => "E$totalRow"], 'G' => ['f' => "G$totalRow"],
+            ];
+        } else {
+            $prevAnchor = $anchor - $blockHeight;
+            $prevAccumRow = $prevAnchor + 13;
+            $rows[$accumRow] = [
+                'A' => $B('Acumulation'),
+                'C' => ['f' => "C$prevAccumRow+C$totalRow"],
+                'E' => ['f' => "E$prevAccumRow+E$totalRow"],
+                'G' => ['f' => "G$prevAccumRow+G$totalRow"],
+            ];
+        }
+        $rows[$anchor + 14] = ['B' => $B('Operator'), 'D' => $B('Foreman'), 'F' => $B('Supervisor')];
+        $rows[$anchor + 15] = ['B' => $N(''), 'D' => $N(''), 'F' => $N('')];
+
+        $merges[] = "B$anchor:C$anchor";
+        $merges[] = "D$anchor:E$anchor";
+        $merges[] = "F$anchor:G$anchor";
+    }
+
+    $colWidths = ['A' => 8, 'B' => 16, 'C' => 12, 'D' => 16, 'E' => 12, 'F' => 16, 'G' => 12];
+
+    return xlsx_write_workbook($rows, $merges, $colWidths, 'FO Pump Assy', 'G');
 }
 
 // ---------------------------------------------------------------------------

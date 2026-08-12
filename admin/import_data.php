@@ -43,8 +43,25 @@ if (($_GET['action'] ?? '') === 'template' && $section) {
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     $out = fopen('php://output', 'w');
     fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel opens it cleanly
-    fputcsv($out, $cfg['template']);
+    fputcsv($out, import_fillable_cols($cfg));
     fclose($out);
+    exit;
+}
+
+// ---- Template download (Excel, block layout matching the check sheet / printed form) ----
+if (($_GET['action'] ?? '') === 'xlsx_template' && $section) {
+    $cfg = $registry[$section['route']];
+    if (isset($cfg['xlsx_template']) && function_exists($cfg['xlsx_template'])) {
+        $tplYear = (int)($_GET['year'] ?? 2026);
+        $tplMonth = (int)($_GET['month'] ?? date('n'));
+        $bytes = ($cfg['xlsx_template'])($tplYear, $tplMonth);
+        $filename = 'template_' . preg_replace('/[^a-z0-9]+/i', '_', strtolower($section['name']))
+            . '_' . $tplYear . '_' . str_pad((string)$tplMonth, 2, '0', STR_PAD_LEFT) . '.xlsx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . strlen($bytes));
+        echo $bytes;
+    }
     exit;
 }
 
@@ -123,6 +140,8 @@ require __DIR__ . '/../includes/app_top.php';
 $cfg = $section ? $registry[$section['route']] : null;
 ?>
 
+<div class="import-page">
+
 <?php if ($error): ?><div class="alert alert-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
 <?php if ($result): ?>
@@ -142,57 +161,112 @@ $cfg = $section ? $registry[$section['route']] : null;
     <?php endif; ?>
 <?php endif; ?>
 
-<form method="get" class="filter-form">
-    <label>Section:</label>
-    <select name="section_id" onchange="this.form.submit()">
-        <?php foreach ($allSections as $s): ?>
-            <option value="<?= $s['id'] ?>" <?= $s['id'] == $selected_section_id ? 'selected' : '' ?>>
-                <?= htmlspecialchars($s['dept_name'] . ' · ' . $s['name']) ?>
-            </option>
-        <?php endforeach; ?>
-    </select>
-</form>
+<div class="section-picker">
+    <label for="section_id">Section</label>
+    <form method="get" id="section-form">
+        <select name="section_id" id="section_id" onchange="this.form.submit()">
+            <?php foreach ($allSections as $s): ?>
+                <option value="<?= $s['id'] ?>" <?= $s['id'] == $selected_section_id ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($s['dept_name'] . ' · ' . $s['name']) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </form>
+</div>
 
 <?php if ($section): ?>
-<div class="admin-form">
-    <h3 style="margin:0 0 6px;font:600 15px Inter,sans-serif;">1. Download the template</h3>
-    <p style="margin:0 0 10px;color:#6b7280;font-size:13px;"><?= htmlspecialchars($cfg['note']) ?></p>
-    <p style="margin:0 0 12px;">
-        <a class="btn" href="import_data.php?section_id=<?= $selected_section_id ?>&action=template">Download CSV Template</a>
-    </p>
-    <p style="margin:0 0 6px;color:#6b7280;font-size:12.5px;">Columns:</p>
-    <div style="overflow-x:auto;">
-        <code style="display:inline-block;background:#f4f5f7;border:1px solid #e3e5e9;border-radius:6px;padding:8px 10px;font-size:12.5px;white-space:nowrap;">
-            <?= htmlspecialchars(implode(', ', $cfg['template'])) ?>
-        </code>
+<div class="import-steps">
+
+    <div class="import-card">
+        <div class="import-step-head">
+            <span class="import-step-num">1</span>
+            <span class="import-step-title">Download the template</span>
+        </div>
+        <p class="import-note"><?= htmlspecialchars($cfg['note']) ?></p>
+
+        <?php if (isset($cfg['xlsx_template'])):
+            $tplMonth = (int) date('n');
+            $tplYear = 2026;
+            $monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        ?>
+            <form method="get" class="import-actions">
+                <input type="hidden" name="section_id" value="<?= $selected_section_id ?>">
+                <input type="hidden" name="action" value="xlsx_template">
+                <select name="month" class="import-month-select">
+                    <?php foreach ($monthNames as $i => $mName): ?>
+                        <option value="<?= $i + 1 ?>" <?= ($i + 1) == $tplMonth ? 'selected' : '' ?>><?= $mName ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <select name="year" class="import-month-select">
+                    <?php for ($y = 2025; $y <= 2027; $y++): ?>
+                        <option value="<?= $y ?>" <?= $y == $tplYear ? 'selected' : '' ?>><?= $y ?></option>
+                    <?php endfor; ?>
+                </select>
+                <button type="submit" class="btn">Download Excel Template</button>
+            </form>
+            <p class="import-alt">
+                One block per day, dated to match the chosen month's real calendar (28-31 blocks depending on the month). Total is auto-summed from that day's Quantity cells, and Acumulation auto-adds the previous day's Acumulation to that day's Total — just fill in Model/Quantity, they calculate themselves in Excel.
+                Prefer a flat spreadsheet? <a href="import_data.php?section_id=<?= $selected_section_id ?>&action=template">Download CSV Template</a> instead.
+            </p>
+        <?php else: ?>
+            <div class="import-actions">
+                <a class="btn" href="import_data.php?section_id=<?= $selected_section_id ?>&action=template">Download CSV Template</a>
+            </div>
+        <?php endif; ?>
+
+        <details class="import-columns">
+            <summary>Columns (grouped to match the check sheet form)</summary>
+            <div class="col-groups">
+                <?php foreach (($cfg['groups'] ?? [['label' => 'Columns', 'cols' => $cfg['template']]]) as $g): $ro = !empty($g['readonly']); ?>
+                    <div class="col-group<?= $ro ? ' readonly' : '' ?>">
+                        <div class="col-group-label">
+                            <?= htmlspecialchars($g['label']) ?><?php if ($ro): ?> <span class="col-group-note">(not in the fillable template)</span><?php endif; ?>
+                        </div>
+                        <div class="col-chip-row">
+                            <?php foreach ($g['cols'] as $c): ?>
+                                <span class="col-chip"><?= htmlspecialchars($c) ?></span>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </details>
     </div>
 
-    <h3 style="margin:22px 0 8px;font:600 15px Inter,sans-serif;">2. Upload the filled <?= isset($cfg['xlsx_extract']) ? 'CSV or the original .xlsx report(s)' : 'CSV' ?></h3>
-    <?php if (isset($cfg['xlsx_extract'])): ?>
-        <p style="margin:0 0 10px;color:#6b7280;font-size:13px;">You can select several files at once (e.g. one .xlsx per month, or several daily files) — they'll all be imported together.</p>
-    <?php endif; ?>
-    <form method="post" enctype="multipart/form-data">
-        <input type="hidden" name="action" value="import">
-        <input type="hidden" name="section_id" value="<?= $selected_section_id ?>">
-        <div class="form-row">
-            <input type="file" name="csv[]" accept="<?= isset($cfg['xlsx_extract']) ? '.csv,.xlsx,text/csv' : '.csv,text/csv' ?>" multiple required>
+    <div class="import-card">
+        <div class="import-step-head">
+            <span class="import-step-num">2</span>
+            <span class="import-step-title">Upload the filled <?= isset($cfg['xlsx_extract']) ? 'CSV or the original .xlsx report(s)' : 'CSV' ?></span>
         </div>
-        <div class="form-row">
+        <?php if (isset($cfg['xlsx_extract'])): ?>
+            <p class="import-note">You can select several files at once (e.g. one .xlsx per month, or several daily files) — they'll all be imported together.</p>
+        <?php endif; ?>
+        <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="import">
+            <input type="hidden" name="section_id" value="<?= $selected_section_id ?>">
+            <div class="import-dropzone">
+                <input type="file" name="csv[]" accept="<?= isset($cfg['xlsx_extract']) ? '.csv,.xlsx,text/csv' : '.csv,text/csv' ?>" multiple required>
+            </div>
             <button type="submit" class="btn" onclick="return confirm('Import this CSV into <?= htmlspecialchars($section['name']) ?>? Existing entries on the same date will be updated.')">Import Now</button>
-        </div>
-    </form>
-    <p style="margin:14px 0 0;color:#8b93a1;font-size:12px;">
-        Dates accept <code>YYYY-MM-DD</code> or <code>DD/MM/YYYY</code>. Rows are matched to their date &mdash; existing dates are updated, new dates are created. Backdated dates are allowed.
-    </p>
+        </form>
+        <p class="import-hint">
+            Dates accept <code>YYYY-MM-DD</code> or <code>DD/MM/YYYY</code>. Rows are matched to their date — existing dates are updated, new dates are created. Backdated dates are allowed.
+        </p>
+    </div>
 
-    <h3 style="margin:24px 0 8px;font:600 15px Inter,sans-serif;">Export existing data</h3>
-    <p style="margin:0 0 12px;color:#6b7280;font-size:13px;">Download all saved <?= htmlspecialchars($section['name']) ?> data as CSV (same columns as the template &mdash; good for backup or re-import).</p>
-    <p style="margin:0;">
+    <div class="import-card import-export">
+        <div class="import-export-text">
+            <div class="import-step-title">Export existing data</div>
+            <p>Download all saved <?= htmlspecialchars($section['name']) ?> data as CSV (same columns as the template — good for backup or re-import).</p>
+        </div>
         <a class="btn btn-secondary" href="import_data.php?section_id=<?= $selected_section_id ?>&action=export">Export to CSV</a>
-    </p>
+    </div>
+
 </div>
 <?php else: ?>
     <div class="empty">No importable sections found.</div>
 <?php endif; ?>
+
+</div>
 
 <?php require __DIR__ . '/../includes/app_bottom.php'; ?>

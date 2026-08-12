@@ -206,3 +206,225 @@
     gap: 10px;
     margin-top: 18px;
 }
+
+/* ---- Import Data page ---- */
+.import-page { max-width: 900px; }
+
+.section-picker {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.section-picker label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #8b93a1;
+}
+
+.section-picker select {
+    flex: 1;
+    max-width: 360px;
+    padding: 10px 12px;
+    border: 1px solid #d7dbe2;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #1f2430;
+    background: #fff;
+}
+
+.section-picker select:focus { outline: none; border-color: #b8382a; }
+
+.import-steps { display: flex; flex-direction: column; gap: 16px; }
+
+.import-card {
+    background: #fff;
+    border: 1px solid #e6e8ec;
+    border-radius: 10px;
+    padding: 20px 22px;
+}
+
+.import-step-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.import-step-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #b8382a;
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.import-step-title { font-size: 14.5px; font-weight: 700; color: #1f2430; }
+
+.import-note {
+    color: #8b93a1;
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 0 0 16px;
+}
+
+.import-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    margin-bottom: 4px;
+}
+
+.import-month-select {
+    padding: 10px 12px;
+    border: 1px solid #d7dbe2;
+    border-radius: 6px;
+    font-size: 13.5px;
+    color: #1f2430;
+    background: #fff;
+}
+
+.import-month-select:focus { outline: none; border-color: #b8382a; }
+
+.import-alt {
+    font-size: 12.5px;
+    color: #aeb4bd;
+    margin: 10px 0 0;
+    line-height: 1.5;
+}
+
+.import-alt a { color: #b8382a; font-weight: 600; text-decoration: none; }
+.import-alt a:hover { text-decoration: underline; }
+
+.import-columns { margin-top: 18px; }
+
+.import-columns summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #6b7280;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+}
+
+.import-columns summary::-webkit-details-marker { display: none; }
+
+.import-columns summary::before {
+    content: '\25B8';
+    display: inline-block;
+    color: #b8b8b8;
+    transition: transform .15s ease;
+    font-size: 11px;
+}
+
+.import-columns[open] summary::before { transform: rotate(90deg); }
+
+.col-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.col-group {
+    border: 1px solid #eef0f2;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #fafbfc;
+}
+
+.col-group.readonly { background: #f6f6f7; border-style: dashed; }
+
+.col-group-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #8b93a1;
+    margin-bottom: 8px;
+}
+
+.col-group.readonly .col-group-label { color: #b0b5bd; }
+
+.col-group-label .col-group-note {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #c2c7cf;
+}
+
+.col-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.col-chip {
+    display: inline-block;
+    background: #fff;
+    border: 1px solid #e6e8ec;
+    border-radius: 5px;
+    padding: 4px 9px;
+    font-size: 11.5px;
+    color: #1f2430;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+
+.col-group.readonly .col-chip { background: #eef0f2; color: #aeb4bd; border-color: #e6e8ec; }
+
+.import-dropzone {
+    border: 1.5px dashed #d7dbe2;
+    border-radius: 8px;
+    padding: 16px;
+    background: #fafbfc;
+    margin-bottom: 14px;
+}
+
+.import-dropzone input[type="file"] {
+    width: 100%;
+    font-size: 13px;
+    color: #4a5262;
+}
+
+.import-hint {
+    color: #aeb4bd;
+    font-size: 12px;
+    margin: 12px 0 0;
+    line-height: 1.5;
+}
+
+.import-hint code {
+    background: #f4f5f7;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 11.5px;
+}
+
+.import-card.import-export {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.import-export-text { max-width: 480px; }
+.import-export-text .import-step-title { margin-bottom: 4px; }
+.import-export-text p { margin: 0; color: #8b93a1; font-size: 13px; line-height: 1.5; }
+
+.btn-secondary {
+    background: #fff;
+    color: #4a5262;
+    border: 1px solid #d7dbe2;
+    white-space: nowrap;
+}
+.btn-secondary:hover { background: #f5f6f8; }

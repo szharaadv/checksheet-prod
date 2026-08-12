@@ -102,3 +102,110 @@ function xlsx_read_workbook(string $path): array
     $zip->close();
     return $sheets;
 }
+
+/**
+ * Minimal .xlsx writer (no external library) — enough to produce a
+ * block-layout template that mirrors a printed report, for the user to fill
+ * in Excel and re-upload. Uses inline strings (no sharedStrings part needed).
+ *
+ * @param array $rows       [rowNum => [colLetter => ['v' => string, 'b' => bool bold] | ['f' => 'SUM(C1:C2)', 'b' => bool]]]
+ *                           'f' (formula, without leading '=') takes priority over 'v' if both are set.
+ * @param array $merges     list of "B1:C1" style ranges
+ * @param array $colWidths  [colLetter => width] (default 12 for unlisted columns up to $lastCol)
+ * @param string $lastCol   rightmost column letter used, for default width sizing
+ */
+function xlsx_write_workbook(array $rows, array $merges = [], array $colWidths = [], string $sheetName = 'Sheet1', string $lastCol = 'G'): string
+{
+    $esc = fn($s) => htmlspecialchars((string) $s, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+
+    $colLetters = [];
+    for ($c = 'A'; $c <= $lastCol; $c++) { $colLetters[] = $c; if ($c === $lastCol) break; }
+    $colsXml = '<cols>';
+    foreach ($colLetters as $i => $c) {
+        $w = $colWidths[$c] ?? 12;
+        $colsXml .= '<col min="' . ($i + 1) . '" max="' . ($i + 1) . '" width="' . $w . '" customWidth="1"/>';
+    }
+    $colsXml .= '</cols>';
+
+    $maxRow = $rows ? max(array_keys($rows)) : 1;
+    $sheetDataXml = '';
+    for ($r = 1; $r <= $maxRow; $r++) {
+        if (empty($rows[$r])) continue;
+        $sheetDataXml .= '<row r="' . $r . '">';
+        foreach ($rows[$r] as $col => $cell) {
+            $style = !empty($cell['b']) ? ' s="1"' : '';
+            if (isset($cell['f']) && $cell['f'] !== '') {
+                // Formula cell: no t= attribute (defaults to numeric result), Excel computes/caches <v> on open.
+                $sheetDataXml .= '<c r="' . $col . $r . '"' . $style . '><f>' . $esc($cell['f']) . '</f></c>';
+                continue;
+            }
+            $v = $cell['v'] ?? '';
+            if ($v === '') continue;
+            $sheetDataXml .= '<c r="' . $col . $r . '" t="inlineStr"' . $style . '><is><t xml:space="preserve">' . $esc($v) . '</t></is></c>';
+        }
+        $sheetDataXml .= '</row>';
+    }
+
+    $mergeXml = '';
+    if ($merges) {
+        $mergeXml = '<mergeCells count="' . count($merges) . '">';
+        foreach ($merges as $m) { $mergeXml .= '<mergeCell ref="' . $esc($m) . '"/>'; }
+        $mergeXml .= '</mergeCells>';
+    }
+
+    $sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . $colsXml
+        . '<sheetData>' . $sheetDataXml . '</sheetData>'
+        . $mergeXml
+        . '</worksheet>';
+
+    $stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
+        . '<fills count="1"><fill><patternFill patternType="none"/></fill></fills>'
+        . '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+        . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+        . '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'
+        . '</styleSheet>';
+
+    $workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        . '<sheets><sheet name="' . $esc($sheetName) . '" sheetId="1" r:id="rId1"/></sheets>'
+        . '<calcPr fullCalcOnLoad="1"/>'
+        . '</workbook>';
+
+    $workbookRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        . '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+        . '</Relationships>';
+
+    $rootRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        . '</Relationships>';
+
+    $contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        . '<Default Extension="xml" ContentType="application/xml"/>'
+        . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+        . '</Types>';
+
+    $tmp = tempnam(sys_get_temp_dir(), 'xlsx');
+    $zip = new ZipArchive();
+    $zip->open($tmp, ZipArchive::OVERWRITE);
+    $zip->addFromString('[Content_Types].xml', $contentTypesXml);
+    $zip->addFromString('_rels/.rels', $rootRelsXml);
+    $zip->addFromString('xl/workbook.xml', $workbookXml);
+    $zip->addFromString('xl/_rels/workbook.xml.rels', $workbookRelsXml);
+    $zip->addFromString('xl/styles.xml', $stylesXml);
+    $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
+    $zip->close();
+    $bytes = file_get_contents($tmp);
+    unlink($tmp);
+    return $bytes;
+}
