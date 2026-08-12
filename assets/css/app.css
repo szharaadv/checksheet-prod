@@ -225,6 +225,7 @@ body {
 }
 .nav-subitem:hover { background: rgba(255,255,255,.05); color: #c3c7cd; }
 .nav-subitem.active { color: #e8a89f; font-weight: 700; }
+.nav-subdivider { height: 1px; background: rgba(255,255,255,.08); margin: 8px 12px; }
 
 /* ---------- Main area ---------- */
 .app-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }

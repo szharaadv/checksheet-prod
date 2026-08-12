@@ -114,6 +114,9 @@ function icon(string $name): string
                 <a class="nav-subitem <?= $active_nav === 'config-checker' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checkers.php">Checked By</a>
                 <a class="nav-subitem <?= $active_nav === 'config-shift' ? 'active' : '' ?>" href="<?= $base_url ?>admin/master.php?type=shift">Shift</a>
             <?php endif; ?>
+            <div class="nav-subdivider"></div>
+            <a class="nav-subitem <?= $active_nav === 'config-import' ? 'active' : '' ?>" href="<?= $base_url ?>admin/import_data.php<?= $import_qs ?>">Import Data</a>
+            <a class="nav-subitem" href="<?= $base_url ?>admin/import_data.php<?= $import_qs ? $import_qs . '&' : '?' ?>action=export">Export Data</a>
         </div>
 
         <div class="nav-group-label">Management</div>
@@ -122,9 +125,6 @@ function icon(string $name): string
         </a>
         <a class="nav-item <?= $active_nav === 'config-roles' ? 'active' : '' ?>" href="<?= $base_url ?>admin/role_permissions.php">
             <?= icon('gear') ?> Role Permissions
-        </a>
-        <a class="nav-item <?= $active_nav === 'config-import' ? 'active' : '' ?>" href="<?= $base_url ?>admin/import_data.php">
-            <?= icon('doc') ?> Import Data
         </a>
         <a class="nav-item disabled" href="<?= $base_url ?>soon.php?feature=Audit+Log">
             <?= icon('list') ?> Audit Log
