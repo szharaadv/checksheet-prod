@@ -79,6 +79,7 @@ require __DIR__ . '/includes/app_top.php';
 <?php
 $deptName = '';
 foreach ($departments as $d) { if ($d['id'] == $selected_department_id) { $deptName = $d['name']; break; } }
+$backQuery = $_SERVER['QUERY_STRING'] ?? '';
 ?>
 <div class="cs-card-list">
     <?php foreach ($rows as $row): ?>
@@ -95,7 +96,7 @@ foreach ($departments as $d) { if ($d['id'] == $selected_department_id) { $deptN
             </div>
         </div>
         <span class="cs-status cs-status-submitted">Saved</span>
-        <a href="view_fopump_checksheet_detail.php?id=<?= $row['id'] ?>" class="cs-view-btn">View &rarr;</a>
+        <a href="view_fopump_checksheet_detail.php?id=<?= $row['id'] ?>&back=<?= urlencode($backQuery) ?>" class="cs-view-btn">View &rarr;</a>
     </div>
     <?php endforeach; ?>
     <?php if (!$rows): ?><div class="empty-state">No reports logged for this month yet.</div><?php endif; ?>

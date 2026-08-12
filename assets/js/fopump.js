@@ -1,12 +1,20 @@
 function recalcTotals() {
+    const sums = { prod: 0, assy: 0, export: 0 };
     ['prod', 'assy', 'export'].forEach(group => {
-        let sum = 0;
         document.querySelectorAll(`.f-qty[data-group="${group}"]`).forEach(el => {
             const n = parseFloat(el.value);
-            if (!isNaN(n)) sum += n;
+            if (!isNaN(n)) sums[group] += n;
         });
+    });
+    // To Sparepart PTC quantity counts towards the Assembly Line total only —
+    // it does not get its own separate Total.
+    const display = { prod: sums.prod, assy: sums.assy + sums.export };
+    Object.keys(display).forEach(group => {
         const cell = document.querySelector(`.f-total[data-group="${group}"]`);
-        if (cell) cell.textContent = Number.isInteger(sum) ? sum : sum.toFixed(2);
+        if (cell) {
+            const v = display[group];
+            cell.textContent = Number.isInteger(v) ? v : v.toFixed(2);
+        }
     });
 }
 

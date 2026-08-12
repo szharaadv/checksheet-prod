@@ -2,6 +2,9 @@
 require_once __DIR__ . '/import_lib.php';
 require_once __DIR__ . '/xlsx_lib.php';
 
+/** Number of production-line rows (NO 1..N) on the FO Pump Assy check sheet / template. */
+if (!defined('FOPUMP_ROW_COUNT')) define('FOPUMP_ROW_COUNT', 12);
+
 /**
  * Registry of importable sections, keyed by section route.
  * Each entry: label, template (CSV column order), note, and importer fn name.
@@ -36,7 +39,7 @@ function import_registry(): array
         'fopump_list.php' => [
             'label'    => 'FO Pump Assy',
             // Columns mirror the F-FIP-03 form / the on-screen check sheet
-            // (fopump_list.php). One CSV row = one production line (NO 1..9);
+            // (fopump_list.php). One CSV row = one production line (NO 1..FOPUMP_ROW_COUNT);
             // Date/Employee/Shift/signatures/Convert/Acumulation repeat on
             // each row of the same date. Total is a read-only, auto-summed
             // field on the form (not stored) — it's excluded from the fillable
@@ -44,12 +47,12 @@ function import_registry(): array
             'template' => ['Date', 'Employee', 'Working Time', 'Shift', 'NO',
                            'FO Pump Production Model', 'FO Pump Production Quantity',
                            'To Assembly Line Model', 'To Assembly Line Quantity',
-                           'To Export YSP Model', 'To Export YSP Quantity',
+                           'To Sparepart PTC Model', 'To Sparepart PTC Quantity',
                            'Total Production', 'Total Assembly', 'Total Export',
                            'Convert Production', 'Convert Assembly', 'Convert Export',
                            'Acumulation Production', 'Acumulation Assembly', 'Acumulation Export',
                            'Operator', 'Foreman', 'Supervisor'],
-            'note'     => 'One row per production line (NO 1..9). Rows with the same Date form one report; Date/Employee/Shift/Convert/Acumulation/signatures repeat on each. Foreman/Supervisor must match an existing name in Checked By master data (Foreman/Supervisor role) — the form uses a dropdown, not free text. Total is auto-computed by the form and not saved, so it is left out of the fillable template. You can also upload the original F-FIP-03 .xlsx report(s) directly (one or many files, each with one or many month sheets) — no re-typing needed.',
+            'note'     => 'One row per production line (NO 1..' . FOPUMP_ROW_COUNT . '). Rows with the same Date form one report; Date/Employee/Shift/Convert/Acumulation/signatures repeat on each. Foreman/Supervisor must match an existing name in Checked By master data (Foreman/Supervisor role) — the form uses a dropdown, not free text. Total is auto-computed by the form and not saved, so it is left out of the fillable template. You can also upload the original F-FIP-03 .xlsx report(s) directly (one or many files, each with one or many month sheets) — no re-typing needed.',
             'fn'       => 'import_fopump',
             'normalize'    => 'fopump_normalize_csv_rows',
             'core'         => 'import_fopump_rows',
@@ -59,10 +62,10 @@ function import_registry(): array
             'groups'   => [
                 ['label' => 'Header — repeat on every row of the same Date',
                  'cols'  => ['Date', 'Employee', 'Working Time', 'Shift']],
-                ['label' => 'Production line detail — one row per NO (1-9)',
+                ['label' => 'Production line detail — one row per NO (1-' . FOPUMP_ROW_COUNT . ')',
                  'cols'  => ['NO', 'FO Pump Production Model', 'FO Pump Production Quantity',
                              'To Assembly Line Model', 'To Assembly Line Quantity',
-                             'To Export YSP Model', 'To Export YSP Quantity']],
+                             'To Sparepart PTC Model', 'To Sparepart PTC Quantity']],
                 ['label' => 'Convert & Acumulation — fill once per Date (repeat on every row)',
                  'cols'  => ['Convert Production', 'Convert Assembly', 'Convert Export',
                              'Acumulation Production', 'Acumulation Assembly', 'Acumulation Export']],
@@ -211,8 +214,8 @@ function fopump_aliases(): array
         'prod_qty'       => ['fo pump production quantity', 'production quantity', 'prod_qty'],
         'assy_model'     => ['to assembly line model', 'assembly model', 'assy_model'],
         'assy_qty'       => ['to assembly line quantity', 'assembly quantity', 'assy_qty'],
-        'export_model'   => ['to export ysp model', 'export model', 'export_model'],
-        'export_qty'     => ['to export ysp quantity', 'export quantity', 'export_qty'],
+        'export_model'   => ['to sparepart ptc model', 'to export ysp model', 'export model', 'export_model'],
+        'export_qty'     => ['to sparepart ptc quantity', 'to export ysp quantity', 'export quantity', 'export_qty'],
         'operator'       => ['operator', 'operator_name'],
         'foreman'        => ['foreman'],
         'supervisor'     => ['supervisor'],
@@ -354,25 +357,38 @@ function fopump_extract_from_xlsx(string $path): array
                 'foreman'      => '',
                 'supervisor'   => '',
             ];
-            $convertRow = $cells[$anchor + 12] ?? [];
-            $accumRow = $cells[$anchor + 13] ?? [];
+
+            // Locate the "Total" row by scanning down from the data rows (col A
+            // == "Total"), instead of assuming a fixed number of NO rows — this
+            // way both the legacy 9-row F-FIP-03 scans and our own generated
+            // template (currently FOPUMP_ROW_COUNT rows) parse correctly.
+            $totalRow = null;
+            for ($r = $anchor + 2; $r <= $anchor + 60; $r++) {
+                if (strtoupper(trim($cells[$r]['A'] ?? '')) === 'TOTAL') { $totalRow = $r; break; }
+            }
+            if ($totalRow === null) continue; // malformed/unrecognised block — skip
+            $lineCount = $totalRow - $anchor - 2; // number of NO data rows actually present in this file
+
+            // Convert=Total+1, Acumulation=Total+2, signature labels=Total+3, values=Total+4.
+            $convertRow = $cells[$totalRow + 1] ?? [];
+            $accumRow = $cells[$totalRow + 2] ?? [];
             $base['convert_prod'] = $convertRow['C'] ?? '';
             $base['convert_assy'] = $convertRow['E'] ?? '';
             $base['convert_export'] = $convertRow['G'] ?? '';
             $base['accum_prod'] = $accumRow['C'] ?? '';
             $base['accum_assy'] = $accumRow['E'] ?? '';
             $base['accum_export'] = $accumRow['G'] ?? '';
-            // Operator/Foreman/Supervisor row (labels at anchor+14, values at
-            // anchor+15 in our own generated template — see fopump_build_template_xlsx()).
+            // Operator/Foreman/Supervisor row (labels at Total+3, values at
+            // Total+4 in our own generated template — see fopump_build_template_xlsx()).
             // On the original printed F-FIP-03 these are hand-signed images, so
             // real scanned files simply have no text here and this stays blank.
-            $opRow = $cells[$anchor + 15] ?? [];
+            $opRow = $cells[$totalRow + 4] ?? [];
             $base['operator'] = $opRow['B'] ?? '';
             $base['foreman'] = $opRow['D'] ?? '';
             $base['supervisor'] = $opRow['F'] ?? '';
 
             $any = false;
-            for ($no = 1; $no <= 9; $no++) {
+            for ($no = 1; $no <= $lineCount; $no++) {
                 $d = $cells[$anchor + 1 + $no] ?? [];
                 $line = array_merge($base, [
                     'row_no'       => (string) $no,
@@ -392,13 +408,16 @@ function fopump_extract_from_xlsx(string $path): array
             }
             if (!$any) {
                 // No production lines for this date. If nothing else was filled in
-                // either (employee/shift/signatures/convert — e.g. a blank Sat/Sun
-                // block left untouched in the template), skip the date entirely
-                // rather than importing an empty report. Acumulation/Total are
-                // excluded from this check since they're auto-computed formulas
-                // that carry a value forward even on a day nothing was typed.
+                // either (employee/shift/convert — e.g. a blank Sat/Sun block left
+                // untouched in the template), skip the date entirely rather than
+                // importing an empty report. Acumulation/Total are excluded from
+                // this check since they're auto-computed formulas that carry a
+                // value forward even on a day nothing was typed. Operator/Foreman/
+                // Supervisor are excluded too: fopump_build_template_xlsx() pre-fills
+                // default names on every day block, so they can't be used to tell a
+                // worked day apart from a blank one.
                 $hasOtherData = false;
-                foreach (['employee', 'working_time', 'shift', 'operator', 'foreman', 'supervisor',
+                foreach (['employee', 'working_time', 'shift',
                           'convert_prod', 'convert_assy', 'convert_export'] as $k) {
                     if (trim((string) ($base[$k] ?? '')) !== '') { $hasOtherData = true; break; }
                 }
@@ -414,11 +433,11 @@ function fopump_extract_from_xlsx(string $path): array
 
 /**
  * Build a blank .xlsx template that mirrors the printed F-FIP-03 block layout
- * (Date/Employee/Working Time row, NO 1-9 table grouped by Model/Quantity,
+ * (Date/Employee/Working Time row, NO 1-N table grouped by Model/Quantity,
  * Total/Convert/Acumulation rows, Operator/Foreman/Supervisor row) instead of
  * one wide flat row per line — this is what fopump_extract_from_xlsx() reads
  * back in, so "download, fill in Excel exactly like the paper form, upload"
- * round-trips cleanly.
+ * round-trips cleanly. N = FOPUMP_ROW_COUNT production-line rows per block.
  *
  * One block is generated per calendar day of the given month (1 .. last day,
  * per the real $year/$month calendar — e.g. 28/29/30/31 as appropriate), with
@@ -432,6 +451,7 @@ function fopump_build_template_xlsx(?int $year = null, ?int $month = null): stri
     $month = max(1, min(12, $month));
     $daysInMonth = (int) date('t', mktime(0, 0, 0, $month, 1, $year));
     $monthLabel = date('F Y', mktime(0, 0, 0, $month, 1, $year));
+    $n = FOPUMP_ROW_COUNT;
 
     $rows = [];
     $B = fn($v) => ['v' => $v, 'b' => true];
@@ -441,7 +461,10 @@ function fopump_build_template_xlsx(?int $year = null, ?int $month = null): stri
                 'D' => $N("One block per day (1-$daysInMonth), Date pre-filled to the $year calendar. Total = SUM of that day's Quantity; Acumulation = previous day's Acumulation + that day's Total.")];
 
     $merges = [];
-    $blockHeight = 18; // rows anchor-1 .. anchor+15, plus one blank spacer row
+    // Rows used per block: date row + anchor row + sub-header + N data rows +
+    // Total + Convert + Acumulation + signature labels + signature values,
+    // plus one blank spacer row before the next block.
+    $blockHeight = $n + 9;
     $anchor1 = 3;
 
     for ($day = 1; $day <= $daysInMonth; $day++) {
@@ -454,47 +477,51 @@ function fopump_build_template_xlsx(?int $year = null, ?int $month = null): stri
             'C' => $B('Employee:'), 'D' => $N(''),
             'E' => $B('Working Time:'), 'F' => $N(''),
         ];
-        // Anchor row: A=NO, B:C="FO PUMP PRODUCTION", D:E="TO ASSEMBLY LINE", F:G="TO EXPORT YSP".
+        // Anchor row: A=NO, B:C="FO PUMP PRODUCTION", D:E="TO ASSEMBLY LINE", F:G="TO SPAREPART PTC".
         $rows[$anchor] = [
-            'A' => $B('NO'), 'B' => $B('FO PUMP PRODUCTION'), 'D' => $B('TO ASSEMBLY LINE'), 'F' => $B('TO EXPORT YSP'),
+            'A' => $B('NO'), 'B' => $B('FO PUMP PRODUCTION'), 'D' => $B('TO ASSEMBLY LINE'), 'F' => $B('TO SPAREPART PTC'),
         ];
         $rows[$anchor + 1] = [
             'B' => $B('Model'), 'C' => $B('Quantity'), 'D' => $B('Model'), 'E' => $B('Quantity'), 'F' => $B('Model'), 'G' => $B('Quantity'),
         ];
-        for ($no = 1; $no <= 9; $no++) {
+        for ($no = 1; $no <= $n; $no++) {
             $r = $anchor + 1 + $no;
             $rows[$r] = ['A' => $N((string) $no), 'B' => $N(''), 'C' => $N(''), 'D' => $N(''), 'E' => $N(''), 'F' => $N(''), 'G' => $N('')];
         }
-        // Total — auto-summed from the 9 Quantity cells of this block (C/E/G rows anchor+2..anchor+10).
+        // Total — auto-summed from the N Quantity cells of this block.
         $qtyFirst = $anchor + 2;
-        $qtyLast = $anchor + 10;
-        $totalRow = $anchor + 11;
-        $accumRow = $anchor + 13;
+        $qtyLast = $anchor + 1 + $n;
+        $totalRow = $anchor + $n + 2;
+        $accumRow = $anchor + $n + 4;
+        // Sparepart PTC quantity counts towards the Assembly Line Total/Acumulation
+        // only — it does not get its own separate Total/Acumulation (column G stays blank).
         $rows[$totalRow] = [
             'A' => $B('Total'),
             'C' => ['f' => "SUM(C$qtyFirst:C$qtyLast)"],
-            'E' => ['f' => "SUM(E$qtyFirst:E$qtyLast)"],
-            'G' => ['f' => "SUM(G$qtyFirst:G$qtyLast)"],
+            'E' => ['f' => "SUM(E$qtyFirst:E$qtyLast,G$qtyFirst:G$qtyLast)"],
         ];
-        $rows[$anchor + 12] = ['A' => $B('Convert'), 'C' => $N(''), 'E' => $N(''), 'G' => $N('')];
+        $rows[$anchor + $n + 3] = ['A' => $B('Convert'), 'C' => $N(''), 'E' => $N(''), 'G' => $N('')];
         // Acumulation — running total: previous day's Acumulation + this day's Total (first block has no previous day).
         if ($day === 1) {
             $rows[$accumRow] = [
                 'A' => $B('Acumulation'),
-                'C' => ['f' => "C$totalRow"], 'E' => ['f' => "E$totalRow"], 'G' => ['f' => "G$totalRow"],
+                'C' => ['f' => "C$totalRow"], 'E' => ['f' => "E$totalRow"],
             ];
         } else {
             $prevAnchor = $anchor - $blockHeight;
-            $prevAccumRow = $prevAnchor + 13;
+            $prevAccumRow = $prevAnchor + $n + 4;
             $rows[$accumRow] = [
                 'A' => $B('Acumulation'),
                 'C' => ['f' => "C$prevAccumRow+C$totalRow"],
                 'E' => ['f' => "E$prevAccumRow+E$totalRow"],
-                'G' => ['f' => "G$prevAccumRow+G$totalRow"],
             ];
         }
-        $rows[$anchor + 14] = ['B' => $B('Operator'), 'D' => $B('Foreman'), 'F' => $B('Supervisor')];
-        $rows[$anchor + 15] = ['B' => $N(''), 'D' => $N(''), 'F' => $N('')];
+        $rows[$anchor + $n + 5] = ['B' => $B('Operator'), 'D' => $B('Foreman'), 'F' => $B('Supervisor')];
+        // Operator/Foreman/Supervisor default to "Reza Kurnia S"/"Trisna"/"Mita" on
+        // every day block. Operator is stored as free text either way; Foreman and
+        // Supervisor must still match an existing name in Checked By master data
+        // (matching role) to link on import.
+        $rows[$anchor + $n + 6] = ['B' => $N('Reza Kurnia S'), 'D' => $N('Trisna'), 'F' => $N('Mita')];
 
         $merges[] = "B$anchor:C$anchor";
         $merges[] = "D$anchor:E$anchor";
@@ -716,11 +743,15 @@ function export_fopump(PDO $pdo, int $dept): array
     foreach ($stmt->fetchAll() as $h) {
         $dstmt->execute([$h['id']]);
         $details = $dstmt->fetchAll();
-        $tp = $ta = $te = 0;
-        foreach ($details as $d) { $tp += $num($d['prod_qty']); $ta += $num($d['assy_qty']); $te += $num($d['export_qty']); }
+        $tp = $ta = 0;
+        foreach ($details as $d) {
+            $tp += $num($d['prod_qty']);
+            // Sparepart PTC quantity counts towards the Assembly Line total only — it does not get its own separate Total.
+            $ta += $num($d['assy_qty']) + $num($d['export_qty']);
+        }
         $base = [
             'Employee' => $h['employee'], 'Working Time' => $h['working_time'], 'Shift' => $h['shift'],
-            'Total Production' => $fmt($tp), 'Total Assembly' => $fmt($ta), 'Total Export' => $fmt($te),
+            'Total Production' => $fmt($tp), 'Total Assembly' => $fmt($ta), 'Total Export' => '',
             'Convert Production' => $h['convert_prod'], 'Convert Assembly' => $h['convert_assy'], 'Convert Export' => $h['convert_export'],
             'Acumulation Production' => $h['accum_prod'], 'Acumulation Assembly' => $h['accum_assy'], 'Acumulation Export' => $h['accum_export'],
             'Operator' => $h['operator_name'], 'Foreman' => $h['foreman_name'], 'Supervisor' => $h['supervisor_name'],
@@ -731,7 +762,7 @@ function export_fopump(PDO $pdo, int $dept): array
                 'Date' => $h['tanggal'], 'NO' => $d['row_no'],
                 'FO Pump Production Model' => $d['prod_model'], 'FO Pump Production Quantity' => $d['prod_qty'],
                 'To Assembly Line Model' => $d['assy_model'], 'To Assembly Line Quantity' => $d['assy_qty'],
-                'To Export YSP Model' => $d['export_model'], 'To Export YSP Quantity' => $d['export_qty'],
+                'To Sparepart PTC Model' => $d['export_model'], 'To Sparepart PTC Quantity' => $d['export_qty'],
             ], $base);
         }
     }

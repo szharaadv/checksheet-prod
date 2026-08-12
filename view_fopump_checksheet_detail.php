@@ -27,14 +27,28 @@ foreach ($stmt->fetchAll() as $d) { $details[(int)$d['row_no']] = $d; }
 
 $num = fn($v) => is_numeric(trim((string)$v)) ? (float)$v : 0;
 $fmt = fn($n) => rtrim(rtrim(number_format((float)$n, 2, '.', ''), '0'), '.') ?: '0';
-$totalProd = $totalAssy = $totalExport = 0;
+$totalProd = $totalAssy = 0;
 foreach ($details as $d) {
     $totalProd += $num($d['prod_qty']);
-    $totalAssy += $num($d['assy_qty']);
-    $totalExport += $num($d['export_qty']);
+    // To Sparepart PTC quantity counts towards the Assembly Line total only — it does not get its own separate Total.
+    $totalAssy += $num($d['assy_qty']) + $num($d['export_qty']);
 }
 
-$rowCount = 9;
+$rowCount = 12;
+
+// Only show as many NO rows as the data actually needs, instead of always
+// rendering all 12 — this also keeps the table short enough to avoid an
+// inner scrollbar in the common case.
+$lastFilledRow = 0;
+foreach ($details as $rowNo => $d) {
+    $hasValue = trim((string)($d['prod_model'] ?? '')) !== '' || trim((string)($d['prod_qty'] ?? '')) !== ''
+        || trim((string)($d['assy_model'] ?? '')) !== '' || trim((string)($d['assy_qty'] ?? '')) !== ''
+        || trim((string)($d['export_model'] ?? '')) !== '' || trim((string)($d['export_qty'] ?? '')) !== '';
+    if ($hasValue) $lastFilledRow = max($lastFilledRow, $rowNo);
+}
+$displayRowCount = min($rowCount, max(1, $lastFilledRow));
+
+$backHref = 'view_fopump_checksheets.php' . (isset($_GET['back']) && $_GET['back'] !== '' ? '?' . $_GET['back'] : '');
 
 $base_url = '';
 $active_nav = 'view-checksheets';
@@ -45,7 +59,7 @@ require __DIR__ . '/includes/app_top.php';
 
 <div class="checksheet-card">
     <div class="dept-context">
-        <a href="view_fopump_checksheets.php" class="dept-switch-link">&larr; Back to list</a>
+        <a href="<?= htmlspecialchars($backHref) ?>" class="dept-switch-link">&larr; Back to list</a>
     </div>
 
     <div class="form-grid-top">
@@ -74,7 +88,7 @@ require __DIR__ . '/includes/app_top.php';
                     <th rowspan="2">NO</th>
                     <th colspan="2">FO Pump Production</th>
                     <th colspan="2">To Assembly Line</th>
-                    <th colspan="2">To Export YSP</th>
+                    <th colspan="2">To Sparepart PTC</th>
                 </tr>
                 <tr>
                     <th>Model</th><th>Quantity</th>
@@ -83,7 +97,7 @@ require __DIR__ . '/includes/app_top.php';
                 </tr>
             </thead>
             <tbody>
-                <?php for ($i = 1; $i <= $rowCount; $i++): $r = $details[$i] ?? null; ?>
+                <?php for ($i = 1; $i <= $displayRowCount; $i++): $r = $details[$i] ?? null; ?>
                 <tr>
                     <td class="row-no"><?= $i ?></td>
                     <td><?= htmlspecialchars($r['prod_model'] ?? '') ?></td>
@@ -100,7 +114,7 @@ require __DIR__ . '/includes/app_top.php';
                     <td class="sum-label" colspan="1">Total</td>
                     <td></td><td class="f-total"><?= htmlspecialchars($fmt($totalProd)) ?></td>
                     <td></td><td class="f-total"><?= htmlspecialchars($fmt($totalAssy)) ?></td>
-                    <td></td><td class="f-total"><?= htmlspecialchars($fmt($totalExport)) ?></td>
+                    <td></td><td class="f-total">-</td>
                 </tr>
                 <tr class="fopump-summary">
                     <td class="sum-label" colspan="1">Convert</td>

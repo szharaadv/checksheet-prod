@@ -36,7 +36,7 @@ CREATE TABLE m_checker (
     id INT AUTO_INCREMENT PRIMARY KEY,
     department_id INT NOT NULL,
     name VARCHAR(100) NOT NULL,
-    role ENUM('foreman', 'supervisor') NULL,
+    role ENUM('foreman', 'supervisor', 'operator') NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     CONSTRAINT fk_checker_department FOREIGN KEY (department_id) REFERENCES m_department(id)
 ) ENGINE=InnoDB;

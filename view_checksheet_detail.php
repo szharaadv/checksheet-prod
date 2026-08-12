@@ -32,6 +32,8 @@ $stmt = $pdo->prepare(
 $stmt->execute([$id]);
 $details = $stmt->fetchAll();
 
+$backHref = 'view_checksheets.php' . (isset($_GET['back']) && $_GET['back'] !== '' ? '?' . $_GET['back'] : '');
+
 $base_url = '';
 $active_nav = 'view-checksheets';
 $page_title = 'Checksheet Detail';
@@ -41,7 +43,7 @@ require __DIR__ . '/includes/app_top.php';
 
 <div class="checksheet-card">
     <div class="dept-context">
-        <a href="view_checksheets.php" class="dept-switch-link">&larr; Back to list</a>
+        <a href="<?= htmlspecialchars($backHref) ?>" class="dept-switch-link">&larr; Back to list</a>
     </div>
 
     <div class="form-grid-top">

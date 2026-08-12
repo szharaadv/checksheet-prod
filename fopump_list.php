@@ -55,7 +55,7 @@ if ($header) {
     }
 }
 
-$rowCount = 9;
+$rowCount = 12;
 
 $base_url = '';
 $active_nav = 'checksheet';
@@ -94,7 +94,7 @@ require __DIR__ . '/includes/app_top.php';
                     <th rowspan="2">NO</th>
                     <th colspan="2">FO Pump Production</th>
                     <th colspan="2">To Assembly Line</th>
-                    <th colspan="2">To Export YSP</th>
+                    <th colspan="2">To Sparepart PTC</th>
                 </tr>
                 <tr>
                     <th>Model</th><th>Quantity</th>
@@ -120,7 +120,7 @@ require __DIR__ . '/includes/app_top.php';
                     <td class="sum-label" colspan="1">Total</td>
                     <td></td><td class="f-total" data-group="prod">0</td>
                     <td></td><td class="f-total" data-group="assy">0</td>
-                    <td></td><td class="f-total" data-group="export">0</td>
+                    <td></td><td class="f-total">-</td>
                 </tr>
                 <tr class="fopump-summary">
                     <td class="sum-label" colspan="1">Convert</td>
@@ -173,5 +173,5 @@ require __DIR__ . '/includes/app_top.php';
     const REPORT_DATE = <?= json_encode($tanggal) ?>;
     const ROW_COUNT = <?= json_encode($rowCount) ?>;
 </script>
-<script src="assets/js/fopump.js"></script>
+<script src="assets/js/fopump.js?v=<?= @filemtime(__DIR__ . '/assets/js/fopump.js') ?: 1 ?>"></script>
 <?php require __DIR__ . '/includes/app_bottom.php'; ?>

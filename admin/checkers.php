@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
     $id = $_POST['id'] ?? '';
     $department_id = (int)($_POST['department_id'] ?? 0);
     $name = trim($_POST['name'] ?? '');
-    $role = in_array($_POST['role'] ?? '', ['foreman', 'supervisor'], true) ? $_POST['role'] : null;
+    $role = in_array($_POST['role'] ?? '', ['foreman', 'supervisor', 'operator'], true) ? $_POST['role'] : null;
 
     if ($name === '' || !$department_id) {
         $error = 'Department and Name are required.';
@@ -101,12 +101,13 @@ require __DIR__ . '/../includes/app_top.php';
         </div>
 
         <div class="form-row">
-            <label>Role (optional, used by Washing Machine Liquid Monitoring)</label>
+            <label>Role (optional, used by Washing Machine Liquid Monitoring / FO Pump Assy)</label>
             <select name="role">
                 <?php $curRole = $editRow['role'] ?? ''; ?>
                 <option value="" <?= $curRole === '' ? 'selected' : '' ?>>- (General Checked By)</option>
                 <option value="foreman" <?= $curRole === 'foreman' ? 'selected' : '' ?>>Foreman</option>
                 <option value="supervisor" <?= $curRole === 'supervisor' ? 'selected' : '' ?>>Supervisor</option>
+                <option value="operator" <?= $curRole === 'operator' ? 'selected' : '' ?>>Operator</option>
             </select>
         </div>
     </div>

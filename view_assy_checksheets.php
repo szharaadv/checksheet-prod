@@ -37,6 +37,8 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $results = $stmt->fetchAll();
 
+$backQuery = $_SERVER['QUERY_STRING'] ?? '';
+
 $base_url = '';
 $active_nav = 'view-checksheets';
 $page_title = 'View Checksheets';
@@ -89,7 +91,7 @@ require __DIR__ . '/includes/app_top.php';
             <div class="cs-card-meta">Checked by <?= htmlspecialchars($row['checker_name']) ?><?php if ($row['no_engine']): ?> &middot; Engine <?= htmlspecialchars($row['no_engine']) ?><?php endif; ?></div>
         </div>
         <span class="cs-status cs-status-submitted">Submitted</span>
-        <a href="view_assy_checksheet_detail.php?id=<?= $row['id'] ?>" class="cs-view-btn">View &rarr;</a>
+        <a href="view_assy_checksheet_detail.php?id=<?= $row['id'] ?>&back=<?= urlencode($backQuery) ?>" class="cs-view-btn">View &rarr;</a>
     </div>
     <?php endforeach; ?>
     <?php if (!$results): ?><div class="empty-state">No checksheets found for this date range / filter.</div><?php endif; ?>
