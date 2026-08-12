@@ -22,6 +22,15 @@ if (!empty($_SESSION['department_id'])) {
 }
 $is_assy_context = $session_department_type === 'assembly';
 
+// Section the user currently has open — used for contextual Import/Export links.
+$current_section_id = null;
+if (!empty($_SESSION['section_route']) && !empty($_SESSION['department_id'])) {
+    $stmt = $pdo->prepare('SELECT id FROM m_checksheet_section WHERE route = ? AND department_id = ? AND is_active = 1 LIMIT 1');
+    $stmt->execute([$_SESSION['section_route'], $_SESSION['department_id']]);
+    $current_section_id = $stmt->fetchColumn() ?: null;
+}
+$import_qs = $current_section_id ? ('?section_id=' . $current_section_id) : '';
+
 $draft_count = $is_assy_context
     ? (int)$pdo->query("SELECT COUNT(*) FROM t_assy_header WHERE status = 'draft'")->fetchColumn()
     : (int)$pdo->query("SELECT COUNT(*) FROM t_checksheet_header WHERE status = 'draft'")->fetchColumn();
