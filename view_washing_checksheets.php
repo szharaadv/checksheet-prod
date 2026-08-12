@@ -71,37 +71,29 @@ require __DIR__ . '/includes/app_top.php';
     </div>
 </form>
 
-<div class="table-scroll">
-<table class="admin-table">
-    <thead>
-        <tr>
-            <th>Date</th>
-            <th>Ganti Air (Kuras)</th>
-            <th>Temperatur Air (&deg;C)</th>
-            <th>Penambahan Gildaon YM08</th>
-            <th>Total Acid</th>
-            <th>Checker</th>
-            <th>Control</th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php foreach ($rows as $row): ?>
-        <tr>
-            <td>
-                <?= htmlspecialchars(date('d/m/Y', strtotime($row['tanggal']))) ?>
-                <?php if ($row['updated_at']): ?><br><small style="color:#8b93a1;">Saved <?= htmlspecialchars(date('d/m/Y H:i', strtotime($row['updated_at']))) ?></small><?php endif; ?>
-            </td>
-            <td><?= htmlspecialchars($row['ganti_air'] ?: '-') ?></td>
-            <td><?= htmlspecialchars($row['temperatur_air'] ?: '-') ?></td>
-            <td><?= htmlspecialchars($row['penambahan_gildaon'] ?: '-') ?></td>
-            <td><?= htmlspecialchars($row['total_acid'] ?: '-') ?></td>
-            <td><?= htmlspecialchars($row['checker_name'] ?: '-') ?></td>
-            <td><?= htmlspecialchars($row['supervisor_name'] ?: '-') ?></td>
-        </tr>
-        <?php endforeach; ?>
-        <?php if (!$rows): ?><tr><td colspan="7" class="empty">No entries logged for this month yet.</td></tr><?php endif; ?>
-    </tbody>
-</table>
+<?php
+$deptName = '';
+foreach ($departments as $d) { if ($d['id'] == $selected_department_id) { $deptName = $d['name']; break; } }
+?>
+<div class="cs-card-list">
+    <?php foreach ($rows as $row): ?>
+    <div class="cs-card">
+        <div class="cs-card-date">
+            <div class="cs-card-day"><?= htmlspecialchars(date('d', strtotime($row['tanggal']))) ?></div>
+            <div class="cs-card-month"><?= htmlspecialchars(date('M', strtotime($row['tanggal']))) ?></div>
+        </div>
+        <div class="cs-card-body">
+            <div class="cs-card-title"><?= htmlspecialchars($deptName) ?></div>
+            <div class="cs-card-meta">
+                Checker <?= htmlspecialchars($row['checker_name'] ?: '-') ?>
+                <?php if ($row['updated_at']): ?> &middot; last saved <?= htmlspecialchars(date('d/m/Y H:i', strtotime($row['updated_at']))) ?><?php endif; ?>
+            </div>
+        </div>
+        <span class="cs-status cs-status-submitted">Saved</span>
+        <a href="view_washing_checksheet_detail.php?id=<?= $row['id'] ?>" class="cs-view-btn">View &rarr;</a>
+    </div>
+    <?php endforeach; ?>
+    <?php if (!$rows): ?><div class="empty-state">No entries logged for this month yet.</div><?php endif; ?>
 </div>
 
 <?php require __DIR__ . '/includes/app_bottom.php'; ?>

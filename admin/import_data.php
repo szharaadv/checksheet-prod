@@ -74,21 +74,40 @@ $error = null;
 // ---- Import upload ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'import' && $section) {
     $cfg = $registry[$section['route']];
+    $supportsXlsx = isset($cfg['xlsx_extract']) && function_exists($cfg['xlsx_extract']);
     try {
-        if (empty($_FILES['csv']) || ($_FILES['csv']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-            throw new RuntimeException('Please choose a CSV file to upload.');
+        $names = $_FILES['csv']['name'] ?? [];
+        $tmpPaths = $_FILES['csv']['tmp_name'] ?? [];
+        $errors = $_FILES['csv']['error'] ?? [];
+        if (!is_array($names)) { $names = [$names]; $tmpPaths = [$tmpPaths]; $errors = [$errors]; }
+        $names = array_values(array_filter($names, fn($n) => $n !== ''));
+        if (!$names) {
+            throw new RuntimeException('Please choose at least one file to upload.');
         }
-        $ext = strtolower(pathinfo($_FILES['csv']['name'], PATHINFO_EXTENSION));
-        if (!in_array($ext, ['csv', 'txt'], true)) {
-            throw new RuntimeException('Only .csv files are accepted.');
+
+        $allRows = [];
+        foreach ($names as $i => $name) {
+            if (($errors[$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                throw new RuntimeException("Upload failed for '$name'.");
+            }
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+            if ($ext === 'csv' || $ext === 'txt') {
+                $raw = csv_read($tmpPaths[$i]);
+                $allRows = array_merge($allRows, isset($cfg['normalize']) ? ($cfg['normalize'])($raw) : $raw);
+            } elseif ($ext === 'xlsx' && $supportsXlsx) {
+                $allRows = array_merge($allRows, ($cfg['xlsx_extract'])($tmpPaths[$i]));
+            } elseif ($ext === 'xlsx') {
+                throw new RuntimeException("'$name': this section does not support .xlsx upload — please use the CSV template.");
+            } else {
+                throw new RuntimeException("'$name': only .csv" . ($supportsXlsx ? ' or .xlsx' : '') . ' files are accepted.');
+            }
         }
-        $rows = csv_read($_FILES['csv']['tmp_name']);
-        if (!$rows) {
-            throw new RuntimeException('The file has no data rows (or headers do not match the template).');
+        if (!$allRows) {
+            throw new RuntimeException('No data rows found (or headers/layout do not match the template).');
         }
-        $fn = $cfg['fn'];
+        $fn = isset($cfg['core']) && function_exists($cfg['core']) ? $cfg['core'] : $cfg['fn'];
         $pdo->beginTransaction();
-        $result = $fn($pdo, (int)$section['department_id'], $rows);
+        $result = $fn($pdo, (int)$section['department_id'], $allRows);
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
@@ -148,12 +167,15 @@ $cfg = $section ? $registry[$section['route']] : null;
         </code>
     </div>
 
-    <h3 style="margin:22px 0 8px;font:600 15px Inter,sans-serif;">2. Upload the filled CSV</h3>
+    <h3 style="margin:22px 0 8px;font:600 15px Inter,sans-serif;">2. Upload the filled <?= isset($cfg['xlsx_extract']) ? 'CSV or the original .xlsx report(s)' : 'CSV' ?></h3>
+    <?php if (isset($cfg['xlsx_extract'])): ?>
+        <p style="margin:0 0 10px;color:#6b7280;font-size:13px;">You can select several files at once (e.g. one .xlsx per month, or several daily files) — they'll all be imported together.</p>
+    <?php endif; ?>
     <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="action" value="import">
         <input type="hidden" name="section_id" value="<?= $selected_section_id ?>">
         <div class="form-row">
-            <input type="file" name="csv" accept=".csv,text/csv" required>
+            <input type="file" name="csv[]" accept="<?= isset($cfg['xlsx_extract']) ? '.csv,.xlsx,text/csv' : '.csv,text/csv' ?>" multiple required>
         </div>
         <div class="form-row">
             <button type="submit" class="btn" onclick="return confirm('Import this CSV into <?= htmlspecialchars($section['name']) ?>? Existing entries on the same date will be updated.')">Import Now</button>

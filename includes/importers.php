@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/import_lib.php';
+require_once __DIR__ . '/xlsx_lib.php';
 
 /**
  * Registry of importable sections, keyed by section route.
@@ -26,11 +27,23 @@ function import_registry(): array
         ],
         'fopump_list.php' => [
             'label'    => 'FO Pump Assy',
-            'template' => ['tanggal', 'row_no', 'prod_model', 'prod_qty', 'assy_model', 'assy_qty', 'export_model', 'export_qty',
-                           'employee', 'working_time', 'shift', 'operator', 'foreman', 'supervisor',
-                           'convert_prod', 'convert_assy', 'convert_export', 'accum_prod', 'accum_assy', 'accum_export'],
-            'note'     => 'Multiple rows per date (one per production line, row_no 1..9). Header fields (employee, totals, signatures) repeat on each row of the same date.',
+            // Columns mirror the F-FIP-03 form. One CSV row = one production
+            // line (NO 1..9); Date/Employee/Shift/signatures/Convert/Acumulation
+            // repeat on each row of the same date. Total columns are computed by
+            // the system (ignored on import, filled on export).
+            'template' => ['Date', 'Employee', 'Working Time', 'Shift', 'NO',
+                           'FO Pump Production Model', 'FO Pump Production Quantity',
+                           'To Assembly Line Model', 'To Assembly Line Quantity',
+                           'To Export YSP Model', 'To Export YSP Quantity',
+                           'Total Production', 'Total Assembly', 'Total Export',
+                           'Convert Production', 'Convert Assembly', 'Convert Export',
+                           'Acumulation Production', 'Acumulation Assembly', 'Acumulation Export',
+                           'Operator', 'Foreman', 'Supervisor'],
+            'note'     => 'One row per production line (NO 1..9). Rows with the same Date form one report; Date/Employee/Shift/Convert/Acumulation/signatures repeat on each. Total columns are auto-computed (ignored on import). You can also upload the original F-FIP-03 .xlsx report(s) directly (one or many files, each with one or many month sheets) — no re-typing needed.',
             'fn'       => 'import_fopump',
+            'normalize'    => 'fopump_normalize_csv_rows',
+            'core'         => 'import_fopump_rows',
+            'xlsx_extract' => 'fopump_extract_from_xlsx',
             'export'   => 'export_fopump',
         ],
         'assembly_list.php' => [
@@ -124,7 +137,62 @@ function import_subassy(PDO $pdo, int $dept, array $rows): array
 // Type B: FO Pump — header + detail, grouped by date
 // ---------------------------------------------------------------------------
 
+/** Field-alias map for FO Pump (supports the F-FIP-03 header layout). */
+function fopump_aliases(): array
+{
+    return [
+        'tanggal'        => ['date', 'tanggal'],
+        'employee'       => ['employee'],
+        'working_time'   => ['working time', 'working_time'],
+        'shift'          => ['shift'],
+        'row_no'         => ['no', 'no.', 'row_no'],
+        'prod_model'     => ['fo pump production model', 'production model', 'prod_model'],
+        'prod_qty'       => ['fo pump production quantity', 'production quantity', 'prod_qty'],
+        'assy_model'     => ['to assembly line model', 'assembly model', 'assy_model'],
+        'assy_qty'       => ['to assembly line quantity', 'assembly quantity', 'assy_qty'],
+        'export_model'   => ['to export ysp model', 'export model', 'export_model'],
+        'export_qty'     => ['to export ysp quantity', 'export quantity', 'export_qty'],
+        'operator'       => ['operator', 'operator_name'],
+        'foreman'        => ['foreman'],
+        'supervisor'     => ['supervisor'],
+        'convert_prod'   => ['convert production', 'convert_prod'],
+        'convert_assy'   => ['convert assembly', 'convert_assy'],
+        'convert_export' => ['convert export', 'convert_export'],
+        'accum_prod'     => ['acumulation production', 'accumulation production', 'accum_prod'],
+        'accum_assy'     => ['acumulation assembly', 'accumulation assembly', 'accum_assy'],
+        'accum_export'   => ['acumulation export', 'accumulation export', 'accum_export'],
+    ];
+}
+
+/** Map raw CSV rows (alias-header keys) to the internal field names used by import_fopump_rows(). */
+function fopump_normalize_csv_rows(array $rows): array
+{
+    $A = fopump_aliases();
+    foreach ($rows as &$r) {
+        $norm = [];
+        foreach ($A as $field => $aliases) {
+            $norm[$field] = import_val($r, $aliases);
+        }
+        $r = $norm;
+    }
+    unset($r);
+    return $rows;
+}
+
 function import_fopump(PDO $pdo, int $dept, array $rows): array
+{
+    return import_fopump_rows($pdo, $dept, fopump_normalize_csv_rows($rows));
+}
+
+/**
+ * Core FO Pump import, operating on already-normalised rows (internal field
+ * names: tanggal, employee, working_time, shift, row_no, prod_model, prod_qty,
+ * assy_model, assy_qty, export_model, export_qty, operator, foreman, supervisor,
+ * convert_prod, convert_assy, convert_export, accum_prod, accum_assy, accum_export).
+ * Shared by the CSV importer (import_fopump) and the .xlsx block reader
+ * (fopump_extract_from_xlsx).
+ */
+function import_fopump_rows(PDO $pdo, int $dept, array $rows): array
 {
     $res = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
     $groups = import_group($rows, ['tanggal']);
@@ -180,6 +248,87 @@ function import_fopump(PDO $pdo, int $dept, array $rows): array
         }
     }
     return $res;
+}
+
+/**
+ * Read the printed F-FIP-03 "Daily Report FO Pump Assy" layout straight from an
+ * .xlsx file (no template re-typing needed) — one or more months per file, one
+ * block per date. Each block is located by its "NO" / "FO PUMP PRODUCTION"
+ * header row (the anchor); every other field is read relative to that row, so
+ * this tolerates blank/skipped weekend rows and minor spacing differences:
+ *
+ *   anchor-1  : Date (B), Employee (D), Working Time (F)
+ *   anchor+1  : NO 1..9 data rows (B/C prod model+qty, D/E assy model+qty, F/G export model+qty)
+ *   anchor+11 : Total row (ignored — recomputed on export)
+ *   anchor+12 : Convert row (C/E/G)
+ *   anchor+13 : Acumulation row (C/E/G)
+ *
+ * Operator/Foreman/Supervisor are signed by hand (inserted images) in the
+ * source file, not typed text, so they come back blank from this reader.
+ * Returns rows normalised the same way as import_fopump_rows() expects.
+ */
+function fopump_extract_from_xlsx(string $path): array
+{
+    $sheets = xlsx_read_workbook($path);
+    $rows = [];
+    foreach ($sheets as $sheet) {
+        $cells = $sheet['cells'];
+        foreach ($cells as $rowNum => $cols) {
+            $colA = strtoupper(trim($cols['A'] ?? ''));
+            $colB = strtoupper(trim($cols['B'] ?? ''));
+            if ($colA !== 'NO' || strpos($colB, 'FO PUMP') === false) continue;
+            $anchor = $rowNum;
+
+            $dateRow = $cells[$anchor - 1] ?? [];
+            $dateRaw = $dateRow['B'] ?? '';
+            $tanggal = is_numeric($dateRaw) ? xlsx_serial_to_date((float) $dateRaw) : (import_parse_date((string) $dateRaw) ?? '');
+            if ($tanggal === '') continue; // not a real block (or unreadable date) — skip
+
+            $base = [
+                'tanggal'      => $tanggal,
+                'employee'     => $dateRow['D'] ?? '',
+                'working_time' => $dateRow['F'] ?? '',
+                'shift'        => '',
+                'operator'     => '',
+                'foreman'      => '',
+                'supervisor'   => '',
+            ];
+            $convertRow = $cells[$anchor + 12] ?? [];
+            $accumRow = $cells[$anchor + 13] ?? [];
+            $base['convert_prod'] = $convertRow['C'] ?? '';
+            $base['convert_assy'] = $convertRow['E'] ?? '';
+            $base['convert_export'] = $convertRow['G'] ?? '';
+            $base['accum_prod'] = $accumRow['C'] ?? '';
+            $base['accum_assy'] = $accumRow['E'] ?? '';
+            $base['accum_export'] = $accumRow['G'] ?? '';
+
+            $any = false;
+            for ($no = 1; $no <= 9; $no++) {
+                $d = $cells[$anchor + 1 + $no] ?? [];
+                $line = array_merge($base, [
+                    'row_no'       => (string) $no,
+                    'prod_model'   => $d['B'] ?? '',
+                    'prod_qty'     => $d['C'] ?? '',
+                    'assy_model'   => $d['D'] ?? '',
+                    'assy_qty'     => $d['E'] ?? '',
+                    'export_model' => $d['F'] ?? '',
+                    'export_qty'   => $d['G'] ?? '',
+                ]);
+                if ($line['prod_model'] === '' && $line['prod_qty'] === '' && $line['assy_model'] === ''
+                    && $line['assy_qty'] === '' && $line['export_model'] === '' && $line['export_qty'] === '') {
+                    continue; // skip empty NO rows entirely
+                }
+                $rows[] = $line;
+                $any = true;
+            }
+            // Date with no filled lines at all still needs a row so the header gets saved.
+            if (!$any) {
+                $rows[] = array_merge($base, ['row_no' => '1', 'prod_model' => '', 'prod_qty' => '',
+                    'assy_model' => '', 'assy_qty' => '', 'export_model' => '', 'export_qty' => '']);
+            }
+        }
+    }
+    return $rows;
 }
 
 // ---------------------------------------------------------------------------
@@ -386,23 +535,28 @@ function export_fopump(PDO $pdo, int $dept): array
     );
     $stmt->execute([$dept]);
     $dstmt = $pdo->prepare('SELECT * FROM t_fopump_detail WHERE header_id = ? ORDER BY row_no');
+    $num = fn($v) => is_numeric(trim((string)$v)) ? (float)$v : 0;
+    $fmt = fn($n) => rtrim(rtrim(number_format((float)$n, 2, '.', ''), '0'), '.') ?: '0';
     $out = [];
     foreach ($stmt->fetchAll() as $h) {
-        $base = [
-            'employee' => $h['employee'], 'working_time' => $h['working_time'], 'shift' => $h['shift'],
-            'operator' => $h['operator_name'], 'foreman' => $h['foreman_name'], 'supervisor' => $h['supervisor_name'],
-            'convert_prod' => $h['convert_prod'], 'convert_assy' => $h['convert_assy'], 'convert_export' => $h['convert_export'],
-            'accum_prod' => $h['accum_prod'], 'accum_assy' => $h['accum_assy'], 'accum_export' => $h['accum_export'],
-        ];
         $dstmt->execute([$h['id']]);
         $details = $dstmt->fetchAll();
+        $tp = $ta = $te = 0;
+        foreach ($details as $d) { $tp += $num($d['prod_qty']); $ta += $num($d['assy_qty']); $te += $num($d['export_qty']); }
+        $base = [
+            'Employee' => $h['employee'], 'Working Time' => $h['working_time'], 'Shift' => $h['shift'],
+            'Total Production' => $fmt($tp), 'Total Assembly' => $fmt($ta), 'Total Export' => $fmt($te),
+            'Convert Production' => $h['convert_prod'], 'Convert Assembly' => $h['convert_assy'], 'Convert Export' => $h['convert_export'],
+            'Acumulation Production' => $h['accum_prod'], 'Acumulation Assembly' => $h['accum_assy'], 'Acumulation Export' => $h['accum_export'],
+            'Operator' => $h['operator_name'], 'Foreman' => $h['foreman_name'], 'Supervisor' => $h['supervisor_name'],
+        ];
         if (!$details) $details = [['row_no' => '', 'prod_model' => '', 'prod_qty' => '', 'assy_model' => '', 'assy_qty' => '', 'export_model' => '', 'export_qty' => '']];
         foreach ($details as $d) {
             $out[] = array_merge([
-                'tanggal' => $h['tanggal'], 'row_no' => $d['row_no'],
-                'prod_model' => $d['prod_model'], 'prod_qty' => $d['prod_qty'],
-                'assy_model' => $d['assy_model'], 'assy_qty' => $d['assy_qty'],
-                'export_model' => $d['export_model'], 'export_qty' => $d['export_qty'],
+                'Date' => $h['tanggal'], 'NO' => $d['row_no'],
+                'FO Pump Production Model' => $d['prod_model'], 'FO Pump Production Quantity' => $d['prod_qty'],
+                'To Assembly Line Model' => $d['assy_model'], 'To Assembly Line Quantity' => $d['assy_qty'],
+                'To Export YSP Model' => $d['export_model'], 'To Export YSP Quantity' => $d['export_qty'],
             ], $base);
         }
     }

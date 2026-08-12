@@ -76,39 +76,29 @@ require __DIR__ . '/includes/app_top.php';
     </div>
 </form>
 
-<div class="table-scroll">
-<table class="admin-table">
-    <thead>
-        <tr>
-            <th>Date</th>
-            <th>Employee</th>
-            <th>Shift</th>
-            <th>Total Production</th>
-            <th>Total To Assembly</th>
-            <th>Total To Export</th>
-            <th>Foreman</th>
-            <th>Supervisor</th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php foreach ($rows as $row): ?>
-        <tr>
-            <td>
-                <?= htmlspecialchars(date('d/m/Y', strtotime($row['tanggal']))) ?>
-                <?php if ($row['updated_at']): ?><br><small style="color:#8b93a1;">Saved <?= htmlspecialchars(date('d/m/Y H:i', strtotime($row['updated_at']))) ?></small><?php endif; ?>
-            </td>
-            <td><?= htmlspecialchars($row['employee'] ?: '-') ?></td>
-            <td><?= htmlspecialchars($row['shift'] ?: '-') ?></td>
-            <td><?= htmlspecialchars($fmt($row['total_prod'])) ?></td>
-            <td><?= htmlspecialchars($fmt($row['total_assy'])) ?></td>
-            <td><?= htmlspecialchars($fmt($row['total_export'])) ?></td>
-            <td><?= htmlspecialchars($row['foreman_name'] ?: '-') ?></td>
-            <td><?= htmlspecialchars($row['supervisor_name'] ?: '-') ?></td>
-        </tr>
-        <?php endforeach; ?>
-        <?php if (!$rows): ?><tr><td colspan="8" class="empty">No reports logged for this month yet.</td></tr><?php endif; ?>
-    </tbody>
-</table>
+<?php
+$deptName = '';
+foreach ($departments as $d) { if ($d['id'] == $selected_department_id) { $deptName = $d['name']; break; } }
+?>
+<div class="cs-card-list">
+    <?php foreach ($rows as $row): ?>
+    <div class="cs-card">
+        <div class="cs-card-date">
+            <div class="cs-card-day"><?= htmlspecialchars(date('d', strtotime($row['tanggal']))) ?></div>
+            <div class="cs-card-month"><?= htmlspecialchars(date('M', strtotime($row['tanggal']))) ?></div>
+        </div>
+        <div class="cs-card-body">
+            <div class="cs-card-title"><?= htmlspecialchars($deptName) ?><?php if ($row['employee']): ?> &middot; <?= htmlspecialchars($row['employee']) ?><?php endif; ?></div>
+            <div class="cs-card-meta">
+                Foreman <?= htmlspecialchars($row['foreman_name'] ?: '-') ?> &middot; Supervisor <?= htmlspecialchars($row['supervisor_name'] ?: '-') ?>
+                <?php if ($row['updated_at']): ?> &middot; last saved <?= htmlspecialchars(date('d/m/Y H:i', strtotime($row['updated_at']))) ?><?php endif; ?>
+            </div>
+        </div>
+        <span class="cs-status cs-status-submitted">Saved</span>
+        <a href="view_fopump_checksheet_detail.php?id=<?= $row['id'] ?>" class="cs-view-btn">View &rarr;</a>
+    </div>
+    <?php endforeach; ?>
+    <?php if (!$rows): ?><div class="empty-state">No reports logged for this month yet.</div><?php endif; ?>
 </div>
 
 <?php require __DIR__ . '/includes/app_bottom.php'; ?>
