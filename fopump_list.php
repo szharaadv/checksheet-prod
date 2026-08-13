@@ -120,7 +120,7 @@ require __DIR__ . '/includes/app_top.php';
                     <td class="sum-label" colspan="1">Total</td>
                     <td></td><td class="f-total" data-group="prod">0</td>
                     <td></td><td class="f-total" data-group="assy">0</td>
-                    <td></td><td class="f-total">-</td>
+                    <td></td><td class="f-total" data-group="export">0</td>
                 </tr>
                 <tr class="fopump-summary">
                     <td class="sum-label" colspan="1">Convert</td>

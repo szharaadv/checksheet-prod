@@ -27,11 +27,11 @@ foreach ($stmt->fetchAll() as $d) { $details[(int)$d['row_no']] = $d; }
 
 $num = fn($v) => is_numeric(trim((string)$v)) ? (float)$v : 0;
 $fmt = fn($n) => rtrim(rtrim(number_format((float)$n, 2, '.', ''), '0'), '.') ?: '0';
-$totalProd = $totalAssy = 0;
+$totalProd = $totalAssy = $totalExport = 0;
 foreach ($details as $d) {
     $totalProd += $num($d['prod_qty']);
-    // To Sparepart PTC quantity counts towards the Assembly Line total only — it does not get its own separate Total.
-    $totalAssy += $num($d['assy_qty']) + $num($d['export_qty']);
+    $totalAssy += $num($d['assy_qty']);
+    $totalExport += $num($d['export_qty']);
 }
 
 $rowCount = 12;
@@ -49,6 +49,16 @@ foreach ($details as $rowNo => $d) {
 $displayRowCount = min($rowCount, max(1, $lastFilledRow));
 
 $backHref = 'view_fopump_checksheets.php' . (isset($_GET['back']) && $_GET['back'] !== '' ? '?' . $_GET['back'] : '');
+$backQuery = isset($_GET['back']) && $_GET['back'] !== '' ? '&back=' . $_GET['back'] : '';
+
+// Next report for the same department, by date (falls back to id for same-date reports).
+$stmt = $pdo->prepare(
+    'SELECT id FROM t_fopump_header
+     WHERE department_id = ? AND (tanggal > ? OR (tanggal = ? AND id > ?))
+     ORDER BY tanggal ASC, id ASC LIMIT 1'
+);
+$stmt->execute([$header['department_id'], $header['tanggal'], $header['tanggal'], $id]);
+$nextId = $stmt->fetchColumn();
 
 $base_url = '';
 $active_nav = 'view-checksheets';
@@ -60,6 +70,11 @@ require __DIR__ . '/includes/app_top.php';
 <div class="checksheet-card">
     <div class="dept-context">
         <a href="<?= htmlspecialchars($backHref) ?>" class="dept-switch-link">&larr; Back to list</a>
+        <?php if ($nextId): ?>
+            <a href="view_fopump_checksheet_detail.php?id=<?= (int) $nextId . $backQuery ?>" class="dept-switch-link dept-switch-link-next">Next &rarr;</a>
+        <?php else: ?>
+            <span class="dept-switch-link dept-switch-link-disabled dept-switch-link-next">Next &rarr;</span>
+        <?php endif; ?>
     </div>
 
     <div class="form-grid-top">
@@ -114,7 +129,7 @@ require __DIR__ . '/includes/app_top.php';
                     <td class="sum-label" colspan="1">Total</td>
                     <td></td><td class="f-total"><?= htmlspecialchars($fmt($totalProd)) ?></td>
                     <td></td><td class="f-total"><?= htmlspecialchars($fmt($totalAssy)) ?></td>
-                    <td></td><td class="f-total">-</td>
+                    <td></td><td class="f-total"><?= htmlspecialchars($fmt($totalExport)) ?></td>
                 </tr>
                 <tr class="fopump-summary">
                     <td class="sum-label" colspan="1">Convert</td>

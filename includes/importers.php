@@ -93,21 +93,25 @@ function import_registry(): array
         ],
         'painting_list.php' => [
             'label'    => 'Painting Checklist',
-            // Columns match the PowerApps export layout. Descriptive columns
-            // (Metode Pengecekkan, Standard Min./Max., Satuan, Tank/Tube) come
-            // from master data, aren't editable on the check sheet form — ignored
-            // on import, only filled in when exporting existing data.
+            // Columns match the PowerApps export layout exactly (Condition, Date,
+            // Checking Item, Metode Pengecekkan, Standard Min./Max., Satuan, Shift,
+            // Jam, Tank/Tube, Actual Result, Category, Checked By :). Descriptive
+            // columns (Metode Pengecekkan, Standard Min./Max., Satuan, Tank/Tube)
+            // come from master data and aren't editable on the check sheet form —
+            // ignored on import — but are still included in the downloadable
+            // template (left blank) to match the original layout exactly.
             'template' => ['Condition', 'Date', 'Checking Item', 'Metode Pengecekkan', 'Standard Min.', 'Standard Max.',
                            'Satuan', 'Shift', 'Jam', 'Tank/Tube', 'Actual Result', 'Category', 'Checked By :'],
-            'note'     => 'One row per checking item. Rows with the same Date + Condition + Jam form one sheet; header fields repeat. Condition / Checking Item must match master data. Descriptive columns (Metode, Standard, Satuan, Tank/Tube) come from master data and are not on the fillable template — they only appear when exporting existing data.',
+            'note'     => 'One row per checking item. Rows with the same Date + Condition + Jam form one sheet; header fields repeat. Condition / Checking Item must match master data. Descriptive columns (Metode, Standard, Satuan, Tank/Tube) come from master data and are ignored on import even though they\'re included in the template — leave them blank or filled in, either way.',
             'fn'       => 'import_painting',
             'export'   => 'export_painting',
+            'template_include_readonly' => true,
             'groups'   => [
                 ['label' => 'Header — repeat on every row of the same Date + Condition + Jam',
                  'cols'  => ['Condition', 'Date', 'Shift', 'Jam', 'Checked By :']],
                 ['label' => 'Checklist detail — one row per checking item',
                  'cols'  => ['Checking Item', 'Actual Result', 'Category']],
-                ['label' => 'Reference from master data — leave blank, only shown when exporting',
+                ['label' => 'Reference from master data — included in the template layout, ignored on import',
                  'cols'  => ['Metode Pengecekkan', 'Standard Min.', 'Standard Max.', 'Satuan', 'Tank/Tube'],
                  'readonly' => true],
             ],
@@ -125,9 +129,18 @@ function import_readonly_cols(array $cfg): array
     return $cols;
 }
 
-/** The columns a user should actually fill in the downloadable template (full template minus readonly/reference columns). */
+/**
+ * The columns for the downloadable blank template. Normally the full template
+ * minus readonly/reference columns (e.g. FO Pump Assy's auto-computed Total),
+ * but a section can set 'template_include_readonly' => true to keep the full
+ * column layout in the template anyway (e.g. Painting, to match the original
+ * PowerApps export layout exactly — those columns are still ignored on import).
+ */
 function import_fillable_cols(array $cfg): array
 {
+    if (!empty($cfg['template_include_readonly'])) {
+        return $cfg['template'];
+    }
     $ro = import_readonly_cols($cfg);
     return array_values(array_filter($cfg['template'], fn($c) => !in_array($c, $ro, true)));
 }
@@ -493,19 +506,20 @@ function fopump_build_template_xlsx(?int $year = null, ?int $month = null): stri
         $qtyLast = $anchor + 1 + $n;
         $totalRow = $anchor + $n + 2;
         $accumRow = $anchor + $n + 4;
-        // Sparepart PTC quantity counts towards the Assembly Line Total/Acumulation
-        // only — it does not get its own separate Total/Acumulation (column G stays blank).
+        // Each group (FO Pump Production / To Assembly Line / To Sparepart PTC)
+        // gets its own independent Total/Acumulation.
         $rows[$totalRow] = [
             'A' => $B('Total'),
             'C' => ['f' => "SUM(C$qtyFirst:C$qtyLast)"],
-            'E' => ['f' => "SUM(E$qtyFirst:E$qtyLast,G$qtyFirst:G$qtyLast)"],
+            'E' => ['f' => "SUM(E$qtyFirst:E$qtyLast)"],
+            'G' => ['f' => "SUM(G$qtyFirst:G$qtyLast)"],
         ];
         $rows[$anchor + $n + 3] = ['A' => $B('Convert'), 'C' => $N(''), 'E' => $N(''), 'G' => $N('')];
         // Acumulation — running total: previous day's Acumulation + this day's Total (first block has no previous day).
         if ($day === 1) {
             $rows[$accumRow] = [
                 'A' => $B('Acumulation'),
-                'C' => ['f' => "C$totalRow"], 'E' => ['f' => "E$totalRow"],
+                'C' => ['f' => "C$totalRow"], 'E' => ['f' => "E$totalRow"], 'G' => ['f' => "G$totalRow"],
             ];
         } else {
             $prevAnchor = $anchor - $blockHeight;
@@ -514,6 +528,7 @@ function fopump_build_template_xlsx(?int $year = null, ?int $month = null): stri
                 'A' => $B('Acumulation'),
                 'C' => ['f' => "C$prevAccumRow+C$totalRow"],
                 'E' => ['f' => "E$prevAccumRow+E$totalRow"],
+                'G' => ['f' => "G$prevAccumRow+G$totalRow"],
             ];
         }
         $rows[$anchor + $n + 5] = ['B' => $B('Operator'), 'D' => $B('Foreman'), 'F' => $B('Supervisor')];
@@ -561,7 +576,14 @@ function import_torque(PDO $pdo, int $dept, array $rows): array
         if (!$model_id) { $res['skipped']++; $res['errors'][] = "Row $line: model '" . ($first['model'] ?? '') . "' not found."; continue; }
 
         $checker = import_resolve_checker($pdo, $dept, $first['checker'] ?? '');
-        if (!empty($first['checker']) && !$checker) $res['errors'][] = "Row $line: checker '{$first['checker']}' not found (saved blank).";
+        if (!$checker) {
+            // checker is required (NOT NULL) on t_assy_header — a blank or
+            // unmatched name can't just be "saved blank" like elsewhere, or the
+            // insert/update fails and aborts the whole import batch.
+            $res['skipped']++;
+            $res['errors'][] = "Row $line: checker '" . ($first['checker'] ?? '') . "' not found or blank — checker is required, row skipped.";
+            continue;
+        }
 
         $params = [import_nz($first['mark_crank_shaft'] ?? ''), import_nz($first['mark_conrod'] ?? ''), import_nz($first['mark_fo_pump'] ?? ''),
             import_nz($first['no_cyl_block'] ?? ''), import_nz($first['no_engine'] ?? ''), import_nz($first['detail_model'] ?? ''), $checker];
@@ -645,12 +667,26 @@ function import_painting(PDO $pdo, int $dept, array $rows): array
 
         $jam = import_parse_time($first['jam'] ?? '');
         $checker = import_resolve_checker($pdo, $dept, $first['checker'] ?? '');
-        if (!empty($first['checker']) && !$checker) $res['errors'][] = "Row $line: checker '{$first['checker']}' not found (saved blank).";
+        if (!$checker) {
+            // Checked By is required (NOT NULL) on t_checksheet_header — a blank or
+            // unmatched name can't just be "saved blank" like elsewhere, or the
+            // insert/update fails and aborts the whole import batch.
+            $res['skipped']++;
+            $res['errors'][] = "Row $line: Checked By '" . ($first['checker'] ?? '') . "' not found or blank — Checked By is required, row skipped.";
+            continue;
+        }
         $shift_id = null;
         if (!empty($first['shift'])) {
             $selShift->execute([$first['shift']]);
             $shift_id = (int)$selShift->fetchColumn() ?: null;
-            if (!$shift_id) $res['errors'][] = "Row $line: shift '{$first['shift']}' not found (saved blank).";
+        }
+        if (!$shift_id) {
+            // shift is required (NOT NULL) on t_checksheet_header — a blank or
+            // unmatched shift name can't just be "saved blank", or the
+            // insert/update fails and aborts the whole import batch.
+            $res['skipped']++;
+            $res['errors'][] = "Row $line: shift '" . ($first['shift'] ?? '') . "' not found or blank — shift is required, row skipped.";
+            continue;
         }
 
         $selH->execute([$dept, $tgl, $cond_id, $jam]);
@@ -743,15 +779,15 @@ function export_fopump(PDO $pdo, int $dept): array
     foreach ($stmt->fetchAll() as $h) {
         $dstmt->execute([$h['id']]);
         $details = $dstmt->fetchAll();
-        $tp = $ta = 0;
+        $tp = $ta = $te = 0;
         foreach ($details as $d) {
             $tp += $num($d['prod_qty']);
-            // Sparepart PTC quantity counts towards the Assembly Line total only — it does not get its own separate Total.
-            $ta += $num($d['assy_qty']) + $num($d['export_qty']);
+            $ta += $num($d['assy_qty']);
+            $te += $num($d['export_qty']);
         }
         $base = [
             'Employee' => $h['employee'], 'Working Time' => $h['working_time'], 'Shift' => $h['shift'],
-            'Total Production' => $fmt($tp), 'Total Assembly' => $fmt($ta), 'Total Export' => '',
+            'Total Production' => $fmt($tp), 'Total Assembly' => $fmt($ta), 'Total Export' => $fmt($te),
             'Convert Production' => $h['convert_prod'], 'Convert Assembly' => $h['convert_assy'], 'Convert Export' => $h['convert_export'],
             'Acumulation Production' => $h['accum_prod'], 'Acumulation Assembly' => $h['accum_assy'], 'Acumulation Export' => $h['accum_export'],
             'Operator' => $h['operator_name'], 'Foreman' => $h['foreman_name'], 'Supervisor' => $h['supervisor_name'],

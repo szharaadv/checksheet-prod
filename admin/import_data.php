@@ -217,10 +217,10 @@ $cfg = $section ? $registry[$section['route']] : null;
         <details class="import-columns">
             <summary>Columns (grouped to match the check sheet form)</summary>
             <div class="col-groups">
-                <?php foreach (($cfg['groups'] ?? [['label' => 'Columns', 'cols' => $cfg['template']]]) as $g): $ro = !empty($g['readonly']); ?>
+                <?php foreach (($cfg['groups'] ?? [['label' => 'Columns', 'cols' => $cfg['template']]]) as $g): $ro = !empty($g['readonly']); $roExcluded = $ro && empty($cfg['template_include_readonly']); ?>
                     <div class="col-group<?= $ro ? ' readonly' : '' ?>">
                         <div class="col-group-label">
-                            <?= htmlspecialchars($g['label']) ?><?php if ($ro): ?> <span class="col-group-note">(not in the fillable template)</span><?php endif; ?>
+                            <?= htmlspecialchars($g['label']) ?><?php if ($roExcluded): ?> <span class="col-group-note">(not in the fillable template)</span><?php endif; ?>
                         </div>
                         <div class="col-chip-row">
                             <?php foreach ($g['cols'] as $c): ?>

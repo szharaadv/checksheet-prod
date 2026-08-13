@@ -6,13 +6,12 @@ function recalcTotals() {
             if (!isNaN(n)) sums[group] += n;
         });
     });
-    // To Sparepart PTC quantity counts towards the Assembly Line total only —
-    // it does not get its own separate Total.
-    const display = { prod: sums.prod, assy: sums.assy + sums.export };
-    Object.keys(display).forEach(group => {
+    // Each group (FO Pump Production / To Assembly Line / To Sparepart PTC)
+    // gets its own independent Total.
+    Object.keys(sums).forEach(group => {
         const cell = document.querySelector(`.f-total[data-group="${group}"]`);
         if (cell) {
-            const v = display[group];
+            const v = sums[group];
             cell.textContent = Number.isInteger(v) ? v : v.toFixed(2);
         }
     });
