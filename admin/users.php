@@ -110,6 +110,27 @@ if (($_GET['action'] ?? '') === 'delete' && isset($_GET['id'])) {
     exit;
 }
 
+// Cleanup for old/orphaned m_checker rows that don't belong to any current
+// User (e.g. leftovers from before this page existed, typo duplicates, or
+// a name that moved sections and left its old unassigned row behind).
+if (($_GET['action'] ?? '') === 'toggle_checker' && isset($_GET['id'])) {
+    $stmt = $pdo->prepare('UPDATE m_checker SET is_active = NOT is_active WHERE id = ?');
+    $stmt->execute([(int)$_GET['id']]);
+    header('Location: users.php');
+    exit;
+}
+
+if (($_GET['action'] ?? '') === 'delete_checker' && isset($_GET['id'])) {
+    try {
+        $stmt = $pdo->prepare('DELETE FROM m_checker WHERE id = ?');
+        $stmt->execute([(int)$_GET['id']]);
+        header('Location: users.php?deleted=1');
+        exit;
+    } catch (PDOException $e) {
+        $error = 'Cannot delete — this name is already used on a submitted check sheet. Deactivate it instead so past records keep the name.';
+    }
+}
+
 $editRow = null;
 $editSectionIds = [];
 if (($_GET['action'] ?? '') === 'edit' && isset($_GET['id'])) {
@@ -143,6 +164,21 @@ foreach ($stmt as $r) {
     $sectionsByUser[$r['user_id']][] = $r['department_name'] . ' · ' . $r['name'];
 }
 
+// Checked By entries whose name doesn't match any current User — usually
+// leftovers from before this page existed, typo duplicates, or a name
+// that moved sections and left its old unassigned row behind.
+$orphanCheckers = $pdo->query(
+    "SELECT c.*, d.name AS department_name, s.name AS section_name FROM m_checker c
+     JOIN m_department d ON d.id = c.department_id
+     LEFT JOIN m_checksheet_section s ON s.id = c.section_id
+     WHERE c.name NOT IN (SELECT name FROM m_user)
+     ORDER BY d.sort_order, c.name"
+)->fetchAll();
+
+// Coming from an orphaned entry's "Add as User" shortcut below.
+$prefillName = $editRow ? '' : trim($_GET['prefill_name'] ?? '');
+$prefillCheckerRole = $editRow ? '' : ($_GET['prefill_checker_role'] ?? '');
+
 $base_url = '../';
 $active_nav = 'config-users';
 $page_title = 'Users';
@@ -153,6 +189,7 @@ require __DIR__ . '/../includes/app_top.php';
 <?php if ($error): ?><div class="alert alert-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 <?php if (isset($_GET['saved'])): ?><div class="alert alert-ok">Data saved.</div><?php endif; ?>
 <?php if (isset($_GET['deleted'])): ?><div class="alert alert-ok">Data deleted.</div><?php endif; ?>
+<?php if ($prefillName): ?><div class="alert alert-ok">Turning "<?= htmlspecialchars($prefillName) ?>" into a proper User — pick their App Role and sections below, then Add.</div><?php endif; ?>
 
 <p class="admin-form-hint">Add each person here — their Checked By entry (used on Washing/Sub Assembly/FO Pump Assy check sheets) is created and kept in sync automatically from their App Role, Checked By Role, and Sections below. <a href="manage_roles.php">Manage roles</a> if you need more than the defaults.</p>
 
@@ -163,12 +200,12 @@ require __DIR__ . '/../includes/app_top.php';
     <div class="form-grid">
         <div class="form-row">
             <label>Name</label>
-            <input type="text" name="name" value="<?= htmlspecialchars($editRow['name'] ?? '') ?>" required>
+            <input type="text" name="name" value="<?= htmlspecialchars($editRow['name'] ?? $prefillName) ?>" required>
         </div>
         <div class="form-row">
             <label>Checked By Role (optional)</label>
             <select name="checker_role">
-                <?php $curCheckerRole = $editRow['checker_role'] ?? ''; ?>
+                <?php $curCheckerRole = $editRow['checker_role'] ?? $prefillCheckerRole; ?>
                 <option value="" <?= $curCheckerRole === '' ? 'selected' : '' ?>>- (none)</option>
                 <?php foreach ($checkerRoles as $cr): ?>
                     <option value="<?= htmlspecialchars($cr['name']) ?>" <?= $curCheckerRole === $cr['name'] ? 'selected' : '' ?>><?= htmlspecialchars($cr['label']) ?></option>
@@ -246,5 +283,42 @@ require __DIR__ . '/../includes/app_top.php';
     </tbody>
 </table>
 </div>
+
+<?php if ($orphanCheckers): ?>
+<div class="section-head" style="margin-top: 32px;">
+    <h2>Other Checked By Entries</h2>
+    <p>Names showing up on check sheets that aren't linked to any User above — usually leftovers from before this page existed, typo duplicates, or someone whose section changed. Deactivate keeps past check sheets showing their name but hides them from new ones; Delete only works if the name was never actually used yet. "Add as User" turns a real person into a proper routed User instead.</p>
+</div>
+<div class="table-scroll">
+<table class="admin-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Department</th>
+            <th>Section</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php foreach ($orphanCheckers as $row): ?>
+        <tr>
+            <td><?= htmlspecialchars($row['name']) ?></td>
+            <td><?= htmlspecialchars($row['department_name']) ?></td>
+            <td><?= $row['section_name'] ? htmlspecialchars($row['section_name']) : '<em style="color:#aeb4bd;">unassigned (shows on all)</em>' ?></td>
+            <td><?= $row['role'] ? htmlspecialchars($checkerRoleLabels[$row['role']] ?? ucfirst($row['role'])) : '-' ?></td>
+            <td><?= $row['is_active'] ? '<span class="badge badge-ok">Active</span>' : '<span class="badge badge-off">Inactive</span>' ?></td>
+            <td class="row-actions">
+                <a href="users.php?prefill_name=<?= urlencode($row['name']) ?>&prefill_checker_role=<?= urlencode($row['role'] ?? '') ?>">Add as User</a>
+                <a href="users.php?action=toggle_checker&id=<?= $row['id'] ?>"><?= $row['is_active'] ? 'Deactivate' : 'Activate' ?></a>
+                <a href="users.php?action=delete_checker&id=<?= $row['id'] ?>" onclick="return confirm('Delete this Checked By entry?')" class="danger">Delete</a>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+    </tbody>
+</table>
+</div>
+<?php endif; ?>
 
 <?php require __DIR__ . '/../includes/app_bottom.php'; ?>
