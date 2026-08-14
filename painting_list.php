@@ -21,6 +21,8 @@ if (!$department) {
 }
 
 $_SESSION['section_route'] = 'painting_list.php';
+require_once __DIR__ . '/includes/auth.php';
+require_section_access($pdo, (int) $department['id'], 'painting_list.php');
 
 $stmt = $pdo->prepare('SELECT * FROM m_checker WHERE department_id = ? AND is_active = 1 ORDER BY name');
 $stmt->execute([$department['id']]);

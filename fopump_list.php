@@ -24,13 +24,29 @@ if (!$department) {
 }
 
 $_SESSION['section_route'] = 'fopump_list.php';
+require_once __DIR__ . '/includes/auth.php';
+require_section_access($pdo, (int) $department['id'], 'fopump_list.php');
 
-$stmt = $pdo->prepare("SELECT * FROM m_checker WHERE department_id = ? AND is_active = 1 AND role = 'foreman' ORDER BY name");
-$stmt->execute([$department['id']]);
+// Checked By entries scoped to this section (or still unassigned to any
+// section) only — keeps FO Pump Assy's Foreman/Supervisor lists from
+// mixing with Torque/Washing/Sub Assembly's, which share the same
+// department_id.
+$stmt = $pdo->prepare(
+    "SELECT c.* FROM m_checker c
+     WHERE c.department_id = ? AND c.is_active = 1 AND c.role = 'foreman'
+       AND (c.section_id IS NULL OR c.section_id = (SELECT id FROM m_checksheet_section WHERE department_id = ? AND route = 'fopump_list.php'))
+     ORDER BY c.name"
+);
+$stmt->execute([$department['id'], $department['id']]);
 $foremen = $stmt->fetchAll();
 
-$stmt = $pdo->prepare("SELECT * FROM m_checker WHERE department_id = ? AND is_active = 1 AND role = 'supervisor' ORDER BY name");
-$stmt->execute([$department['id']]);
+$stmt = $pdo->prepare(
+    "SELECT c.* FROM m_checker c
+     WHERE c.department_id = ? AND c.is_active = 1 AND c.role = 'supervisor'
+       AND (c.section_id IS NULL OR c.section_id = (SELECT id FROM m_checksheet_section WHERE department_id = ? AND route = 'fopump_list.php'))
+     ORDER BY c.name"
+);
+$stmt->execute([$department['id'], $department['id']]);
 $supervisors = $stmt->fetchAll();
 
 // Selected date (backdate allowed, no future).

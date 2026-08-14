@@ -1,6 +1,13 @@
 <?php
 require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/includes/permissions.php';
+require_once __DIR__ . '/includes/auth.php';
 $pdo = get_db();
+
+if (empty($_SESSION['auth_user']['name'])) {
+    header('Location: login.php?next=index.php');
+    exit;
+}
 
 $departments = $pdo->query('SELECT * FROM m_department WHERE is_active = 1 ORDER BY sort_order')->fetchAll();
 ?>
@@ -27,6 +34,7 @@ $departments = $pdo->query('SELECT * FROM m_department WHERE is_active = 1 ORDER
 
     <h1>Select Department</h1>
     <p class="landing-hint">Choose a department to start filling in a check sheet.</p>
+    <p class="landing-hint">Logged in as <strong><?= htmlspecialchars($_SESSION['auth_user']['name']) ?></strong> &middot; <a href="logout.php" class="dept-switch-link">Logout</a></p>
 
     <div class="dept-grid">
         <?php foreach ($departments as $d): ?>

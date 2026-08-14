@@ -252,6 +252,8 @@
     font-size: 11px;
     font-weight: 700;
     letter-spacing: .04em;
+    background: #eef0f2;
+    color: #4a5262;
 }
 .role-superadmin { background: #f3d9d5; color: #8a2b2b; }
 .role-admin      { background: #fde6c9; color: #8a6a15; }

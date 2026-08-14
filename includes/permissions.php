@@ -2,19 +2,48 @@
 /**
  * Central catalog of roles & permissions + helpers.
  *
- * superadmin  -> always has every permission (never stored, forced in code).
- * admin, user -> permissions read from m_role_permission and editable via
- *                admin/role_permissions.php.
+ * Roles themselves are admin-manageable (see admin/manage_roles.php,
+ * table m_role) rather than a fixed list. A role flagged is_full_access
+ * always has every permission (forced in code, not stored in
+ * m_role_permission). Other roles' permissions are read from
+ * m_role_permission and editable via admin/role_permissions.php.
  *
- * To add a new permission, add one entry to permission_catalog() and (once)
- * a default row per role in db/migration_roles.sql.
+ * To add a new permission, add one entry to permission_catalog(); it will
+ * default to "not allowed" for every non-full-access role until toggled
+ * on in the Role Permissions screen.
  */
 require_once __DIR__ . '/../config/db.php';
 
-const APP_ROLES = ['superadmin', 'admin', 'user'];
+/** All roles (active + inactive), ordered for display. */
+function get_all_roles(PDO $pdo): array
+{
+    return $pdo->query('SELECT * FROM m_role ORDER BY sort_order, id')->fetchAll();
+}
 
-/** Roles whose access can actually be toggled in the matrix. */
-const EDITABLE_ROLES = ['admin', 'user'];
+/** Only active roles — what should appear in role-picker dropdowns. */
+function get_active_roles(PDO $pdo): array
+{
+    return $pdo->query('SELECT * FROM m_role WHERE is_active = 1 ORDER BY sort_order, id')->fetchAll();
+}
+
+/** Roles whose access can actually be toggled in the matrix (not full-access). */
+function get_editable_roles(PDO $pdo): array
+{
+    return array_values(array_filter(get_active_roles($pdo), fn($r) => !$r['is_full_access']));
+}
+
+/** True if the given role name is flagged full-access (bypasses section/permission restrictions). */
+function role_has_full_access(PDO $pdo, ?string $role): bool
+{
+    if (!$role) {
+        return false;
+    }
+    static $fullAccessNames = null;
+    if ($fullAccessNames === null) {
+        $fullAccessNames = array_column(array_filter(get_active_roles($pdo), fn($r) => $r['is_full_access']), 'name');
+    }
+    return in_array($role, $fullAccessNames, true);
+}
 
 /**
  * Ordered permission catalog.
@@ -37,22 +66,28 @@ function permission_catalog(): array
 
 /**
  * Full access matrix as [role][perm_key] => bool.
- * superadmin is always fully allowed; admin/user come from the DB
- * (falling back to false for any permission with no stored row).
+ * Full-access roles are always fully allowed; everyone else comes from
+ * the DB (falling back to false for any permission with no stored row).
  */
 function get_role_permissions(PDO $pdo): array
 {
     $matrix = [];
     $keys = array_keys(permission_catalog());
+    $roles = get_active_roles($pdo);
 
-    foreach ($keys as $k) {
-        $matrix['superadmin'][$k] = true;
-        $matrix['admin'][$k] = false;
-        $matrix['user'][$k] = false;
+    foreach ($roles as $role) {
+        foreach ($keys as $k) {
+            $matrix[$role['name']][$k] = (bool)$role['is_full_access'];
+        }
     }
+
+    $fullAccessNames = array_column(array_filter($roles, fn($r) => $r['is_full_access']), 'name');
 
     $rows = $pdo->query('SELECT role, perm_key, allowed FROM m_role_permission')->fetchAll();
     foreach ($rows as $r) {
+        if (in_array($r['role'], $fullAccessNames, true)) {
+            continue; // full-access roles ignore stored rows, stay always-true
+        }
         if (isset($matrix[$r['role']]) && array_key_exists($r['perm_key'], $matrix[$r['role']])) {
             $matrix[$r['role']][$r['perm_key']] = (bool)$r['allowed'];
         }
@@ -63,9 +98,6 @@ function get_role_permissions(PDO $pdo): array
 /** True if the given role has the given permission. */
 function role_can(PDO $pdo, string $role, string $perm): bool
 {
-    if ($role === 'superadmin') {
-        return true;
-    }
     static $cache = null;
     if ($cache === null) {
         $cache = get_role_permissions($pdo);

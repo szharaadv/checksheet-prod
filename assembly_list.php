@@ -21,9 +21,19 @@ if (!$department) {
 }
 
 $_SESSION['section_route'] = 'assembly_list.php';
+require_once __DIR__ . '/includes/auth.php';
+require_section_access($pdo, (int) $department['id'], 'assembly_list.php');
 
-$stmt = $pdo->prepare('SELECT * FROM m_checker WHERE department_id = ? AND is_active = 1 ORDER BY name');
-$stmt->execute([$department['id']]);
+// Checked By entries scoped to this section (or still unassigned to any
+// section) only — keeps Torque's Checked By list from mixing with
+// Washing/Sub Assembly/FO Pump Assy's, which share the same department_id.
+$stmt = $pdo->prepare(
+    "SELECT c.* FROM m_checker c
+     WHERE c.department_id = ? AND c.is_active = 1
+       AND (c.section_id IS NULL OR c.section_id = (SELECT id FROM m_checksheet_section WHERE department_id = ? AND route = 'assembly_list.php'))
+     ORDER BY c.name"
+);
+$stmt->execute([$department['id'], $department['id']]);
 $checkers = $stmt->fetchAll();
 
 $stmt = $pdo->prepare('SELECT * FROM m_assy_model WHERE department_id = ? AND is_active = 1 ORDER BY sort_order');

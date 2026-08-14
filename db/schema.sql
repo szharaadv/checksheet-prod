@@ -30,13 +30,30 @@ CREATE TABLE m_condition (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
+-- Master: Checker roles (Foreman, Supervisor, Operator, ...) — admin
+-- manageable so new roles can be added without a schema change.
+-- ------------------------------------------------------------
+CREATE TABLE m_checker_role (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    label VARCHAR(100) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB;
+
+INSERT INTO m_checker_role (name, label, sort_order) VALUES
+    ('foreman', 'Foreman', 1),
+    ('supervisor', 'Supervisor', 2),
+    ('operator', 'Operator', 3);
+
+-- ------------------------------------------------------------
 -- Master: Checker / "Checked by" list
 -- ------------------------------------------------------------
 CREATE TABLE m_checker (
     id INT AUTO_INCREMENT PRIMARY KEY,
     department_id INT NOT NULL,
     name VARCHAR(100) NOT NULL,
-    role ENUM('foreman', 'supervisor', 'operator') NULL,
+    role VARCHAR(50) NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     CONSTRAINT fk_checker_department FOREIGN KEY (department_id) REFERENCES m_department(id)
 ) ENGINE=InnoDB;

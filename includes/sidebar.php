@@ -3,7 +3,8 @@
  * Expects before include:
  * $base_url    - '' when included from root pages, '../' when included from admin/ pages
  * $active_nav  - one of: checksheet, config-department, config-condition,
- *                config-checklist, config-checker, config-shift
+ *                config-checklist, config-checker, config-shift,
+ *                config-users, config-manage-roles, config-roles
  */
 $base_url = $base_url ?? '';
 $active_nav = $active_nav ?? '';
@@ -120,8 +121,11 @@ function icon(string $name): string
         </div>
 
         <div class="nav-group-label">Management</div>
-        <a class="nav-item disabled" href="<?= $base_url ?>soon.php?feature=Users">
+        <a class="nav-item <?= $active_nav === 'config-users' ? 'active' : '' ?>" href="<?= $base_url ?>admin/users.php">
             <?= icon('user') ?> Users
+        </a>
+        <a class="nav-item <?= $active_nav === 'config-manage-roles' ? 'active' : '' ?>" href="<?= $base_url ?>admin/manage_roles.php">
+            <?= icon('gear') ?> Roles
         </a>
         <a class="nav-item <?= $active_nav === 'config-roles' ? 'active' : '' ?>" href="<?= $base_url ?>admin/role_permissions.php">
             <?= icon('gear') ?> Role Permissions
