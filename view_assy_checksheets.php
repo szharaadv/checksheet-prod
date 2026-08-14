@@ -14,11 +14,16 @@ $stmt->execute([$selected_department_id]);
 $models = $stmt->fetchAll();
 
 $selected_model_id = (int)($_GET['model_id'] ?? 0);
-$date_from = $_GET['date_from'] ?? date('Y-m-d');
-$date_to = $_GET['date_to'] ?? date('Y-m-d');
+
+$month = (int)($_GET['month'] ?? date('n'));
+$year = (int)($_GET['year'] ?? date('Y'));
+$month = max(1, min(12, $month));
+$daysInMonth = (int) date('t', mktime(0, 0, 0, $month, 1, $year));
+$monthStart = sprintf('%04d-%02d-01', $year, $month);
+$monthEnd = sprintf('%04d-%02d-%02d', $year, $month, $daysInMonth);
 
 $where = ["h.status = 'submitted'", 'h.tanggal BETWEEN ? AND ?', 'h.department_id = ?'];
-$params = [$date_from, $date_to, $selected_department_id];
+$params = [$monthStart, $monthEnd, $selected_department_id];
 
 if ($selected_model_id) {
     $where[] = 'h.model_id = ?';
@@ -49,19 +54,29 @@ require __DIR__ . '/includes/app_top.php';
 <form method="get" class="admin-form filter-bar">
     <div class="form-grid">
         <div class="form-row">
-            <label>Date From</label>
-            <input type="date" name="date_from" value="<?= htmlspecialchars($date_from) ?>">
-        </div>
-        <div class="form-row">
-            <label>Date To</label>
-            <input type="date" name="date_to" value="<?= htmlspecialchars($date_to) ?>">
-        </div>
-        <div class="form-row">
             <label>Department</label>
             <select name="department_id">
                 <?php foreach ($departments as $d): ?>
                     <option value="<?= $d['id'] ?>" <?= $d['id'] == $selected_department_id ? 'selected' : '' ?>><?= htmlspecialchars($d['name']) ?></option>
                 <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="form-row">
+            <label>Month</label>
+            <select name="month">
+                <?php
+                $monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+                foreach ($monthNames as $i => $mName): ?>
+                    <option value="<?= $i + 1 ?>" <?= ($i + 1) == $month ? 'selected' : '' ?>><?= $mName ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="form-row">
+            <label>Year</label>
+            <select name="year">
+                <?php for ($y = date('Y') - 2; $y <= date('Y') + 1; $y++): ?>
+                    <option value="<?= $y ?>" <?= $y == $year ? 'selected' : '' ?>><?= $y ?></option>
+                <?php endfor; ?>
             </select>
         </div>
         <div class="form-row">
