@@ -27,14 +27,15 @@ $_SESSION['section_route'] = 'subassy_list.php';
 require_once __DIR__ . '/includes/auth.php';
 require_section_access($pdo, (int) $department['id'], 'subassy_list.php');
 
-// Checked By entries scoped to this section (or still unassigned to any
-// section) only — keeps Sub Assembly's Foreman/Supervisor lists from
-// mixing with Torque/Washing/FO Pump Assy's, which share the same
-// department_id.
+// Checked By entries scoped strictly to this section — keeps Sub
+// Assembly's Foreman/Supervisor lists from mixing with Torque/Washing/FO
+// Pump Assy's, which share the same department_id. Routing lives entirely
+// in admin/users.php now; unassigned m_checker rows are stale leftovers,
+// not a fallback to show here.
 $stmt = $pdo->prepare(
     "SELECT c.* FROM m_checker c
      WHERE c.department_id = ? AND c.is_active = 1 AND c.role = 'foreman'
-       AND (c.section_id IS NULL OR c.section_id = (SELECT id FROM m_checksheet_section WHERE department_id = ? AND route = 'subassy_list.php'))
+       AND c.section_id = (SELECT id FROM m_checksheet_section WHERE department_id = ? AND route = 'subassy_list.php')
      ORDER BY c.name"
 );
 $stmt->execute([$department['id'], $department['id']]);
@@ -43,7 +44,7 @@ $foremen = $stmt->fetchAll();
 $stmt = $pdo->prepare(
     "SELECT c.* FROM m_checker c
      WHERE c.department_id = ? AND c.is_active = 1 AND c.role = 'supervisor'
-       AND (c.section_id IS NULL OR c.section_id = (SELECT id FROM m_checksheet_section WHERE department_id = ? AND route = 'subassy_list.php'))
+       AND c.section_id = (SELECT id FROM m_checksheet_section WHERE department_id = ? AND route = 'subassy_list.php')
      ORDER BY c.name"
 );
 $stmt->execute([$department['id'], $department['id']]);

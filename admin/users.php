@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/checker_sync.php';
 $pdo = get_db();
 
 require_permission('users.manage');
@@ -54,37 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
                 }
             }
 
-            // Make Checked By (m_checker) reflect this person's section
-            // routing: for every section they're now assigned to, make sure
-            // a matching Checked By entry exists — claiming an existing
-            // unassigned entry for the same name/department first (so we
-            // don't create a duplicate), otherwise creating a fresh row.
-            // Sections un-checked here are left alone rather than deleted,
-            // since a Checked By row may already be referenced by past
-            // checksheets.
-            foreach ($selectedSectionIds as $sid) {
-                $sec = $sectionsById[$sid];
-                $deptId = (int) $sec['department_id'];
-
-                $stmt = $pdo->prepare('SELECT id FROM m_checker WHERE name = ? AND section_id = ?');
-                $stmt->execute([$name, $sid]);
-                $checkerId = $stmt->fetchColumn();
-
-                if ($checkerId) {
-                    $pdo->prepare('UPDATE m_checker SET role = ? WHERE id = ?')->execute([$checkerRole, $checkerId]);
-                    continue;
-                }
-
-                $stmt = $pdo->prepare('SELECT id FROM m_checker WHERE name = ? AND department_id = ? AND section_id IS NULL LIMIT 1');
-                $stmt->execute([$name, $deptId]);
-                $unassignedId = $stmt->fetchColumn();
-
-                if ($unassignedId) {
-                    $pdo->prepare('UPDATE m_checker SET section_id = ?, role = ? WHERE id = ?')->execute([$sid, $checkerRole, $unassignedId]);
-                } else {
-                    $pdo->prepare('INSERT INTO m_checker (department_id, section_id, name, role) VALUES (?, ?, ?, ?)')->execute([$deptId, $sid, $name, $checkerRole]);
-                }
-            }
+            sync_checker_entries($pdo, $name, $checkerRole, $selectedSectionIds, $sectionsById);
 
             $pdo->commit();
             header('Location: users.php?saved=1');
@@ -131,6 +102,25 @@ if (($_GET['action'] ?? '') === 'delete_checker' && isset($_GET['id'])) {
     }
 }
 
+// Re-run the sync for every active user at once — for people who were
+// routed before this auto-sync existed, or whose Checked By entry still
+// needs claiming/creating to match their current sections.
+if (($_GET['action'] ?? '') === 'resync_all') {
+    $stmt = $pdo->query(
+        'SELECT u.id, u.name, u.checker_role, GROUP_CONCAT(us.section_id) AS section_ids
+         FROM m_user u
+         JOIN m_user_section us ON us.user_id = u.id
+         WHERE u.is_active = 1
+         GROUP BY u.id'
+    );
+    foreach ($stmt->fetchAll() as $u) {
+        $sids = array_map('intval', explode(',', $u['section_ids']));
+        sync_checker_entries($pdo, $u['name'], $u['checker_role'], $sids, $sectionsById);
+    }
+    header('Location: users.php?resynced=1');
+    exit;
+}
+
 $editRow = null;
 $editSectionIds = [];
 if (($_GET['action'] ?? '') === 'edit' && isset($_GET['id'])) {
@@ -164,14 +154,23 @@ foreach ($stmt as $r) {
     $sectionsByUser[$r['user_id']][] = $r['department_name'] . ' · ' . $r['name'];
 }
 
-// Checked By entries whose name doesn't match any current User — usually
-// leftovers from before this page existed, typo duplicates, or a name
-// that moved sections and left its old unassigned row behind.
+// Checked By entries that don't match any current User's current routing —
+// covers names with no User at all, typo duplicates, AND rows left behind
+// by someone who moved sections (their name still matches a User, but this
+// specific row no longer corresponds to any of their assigned sections).
 $orphanCheckers = $pdo->query(
     "SELECT c.*, d.name AS department_name, s.name AS section_name FROM m_checker c
      JOIN m_department d ON d.id = c.department_id
      LEFT JOIN m_checksheet_section s ON s.id = c.section_id
-     WHERE c.name NOT IN (SELECT name FROM m_user)
+     LEFT JOIN m_user u ON u.name = c.name
+     LEFT JOIN m_user_section us ON us.user_id = u.id AND us.section_id = c.section_id
+     WHERE u.id IS NULL
+        OR (c.section_id IS NOT NULL AND us.section_id IS NULL)
+        OR (c.section_id IS NULL AND EXISTS (
+              SELECT 1 FROM m_user_section us2
+              JOIN m_user u2 ON u2.id = us2.user_id
+              WHERE u2.name = c.name
+            ))
      ORDER BY d.sort_order, c.name"
 )->fetchAll();
 
@@ -189,9 +188,10 @@ require __DIR__ . '/../includes/app_top.php';
 <?php if ($error): ?><div class="alert alert-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 <?php if (isset($_GET['saved'])): ?><div class="alert alert-ok">Data saved.</div><?php endif; ?>
 <?php if (isset($_GET['deleted'])): ?><div class="alert alert-ok">Data deleted.</div><?php endif; ?>
+<?php if (isset($_GET['resynced'])): ?><div class="alert alert-ok">Checked By entries resynced for everyone below.</div><?php endif; ?>
 <?php if ($prefillName): ?><div class="alert alert-ok">Turning "<?= htmlspecialchars($prefillName) ?>" into a proper User — pick their App Role and sections below, then Add.</div><?php endif; ?>
 
-<p class="admin-form-hint">Add each person here — their Checked By entry (used on Washing/Sub Assembly/FO Pump Assy check sheets) is created and kept in sync automatically from their App Role, Checked By Role, and Sections below. <a href="manage_roles.php">Manage roles</a> if you need more than the defaults.</p>
+<p class="admin-form-hint">Add each person here — their Checked By entry (used on Washing/Sub Assembly/FO Pump Assy check sheets) is created and kept in sync automatically from their App Role, Checked By Role, and Sections below, so check sheet dropdowns show exactly who's routed there. <a href="manage_roles.php">Manage roles</a> if you need more than the defaults. <a href="users.php?action=resync_all">Resync everyone now</a> if something looks out of sync.</p>
 
 <form method="post" class="admin-form">
     <input type="hidden" name="action" value="save">
