@@ -243,6 +243,75 @@
 .washing-table tr.row-locked td:first-child { color: #8b93a1; }
 .lock-icon { font-size: 11px; opacity: .6; }
 
+/* ---------- Bake Oven Temperature (F-PS-07): times as rows, days as columns ---------- */
+.bakeoven-table {
+    border-collapse: collapse;
+    background: #fff;
+    font-size: 12px;
+}
+
+.bakeoven-table th, .bakeoven-table td {
+    border: 1px solid #e6e8ec;
+    padding: 4px;
+    text-align: center;
+}
+
+.bakeoven-table thead th {
+    background: #b8382a;
+    color: #fff;
+    position: sticky;
+    top: 0;
+    min-width: 44px;
+    z-index: 1;
+}
+
+.bakeoven-table td.row-label, .bakeoven-table th:first-child {
+    position: sticky;
+    left: 0;
+    background: #fff;
+    text-align: left;
+    font-weight: 600;
+    min-width: 100px;
+    z-index: 1;
+}
+
+.bakeoven-table thead th:first-child { z-index: 2; background: #b8382a; }
+
+.bakeoven-table tbody tr:nth-child(odd) td:not(.row-label) { background: #fafafb; }
+.bakeoven-table tr.paraf-row td.row-label { background: #fff; }
+
+.temp-input {
+    width: 44px;
+    padding: 4px 2px;
+    border: 1px solid #d7dbe2;
+    border-radius: 3px;
+    font-size: 12px;
+    text-align: center;
+}
+
+.temp-input.temp-ok { background: #eafaf0; border-color: #2a6b2a; color: #2a6b2a; }
+.temp-input.temp-ng { background: #fbe9e9; border-color: #a11; color: #a11; font-weight: 700; }
+.temp-input:disabled { background: #f0f1f3; color: #8b93a1; }
+
+.bakeoven-table .paraf-row select { width: 92px; font-size: 11px; padding: 3px; }
+
+.bakeoven-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 18px;
+    align-items: flex-end;
+}
+
+.bakeoven-footer .field-block { min-width: 160px; }
+.bakeoven-footer textarea {
+    padding: 8px;
+    border: 1px solid #d7dbe2;
+    border-radius: 4px;
+    font-size: 13px;
+    resize: vertical;
+}
+
 .actual-input, .actual-select, .category-select {
     width: 100%;
     padding: 6px;

@@ -3,7 +3,7 @@
  * Expects before include:
  * $base_url    - '' when included from root pages, '../' when included from admin/ pages
  * $active_nav  - one of: checksheet, config-department, config-condition,
- *                config-checklist, config-shift,
+ *                config-checklist, config-shift, config-checked-by-view,
  *                config-users, config-manage-roles, config-roles
  */
 $base_url = $base_url ?? '';
@@ -48,13 +48,15 @@ $sectionViewMap = [
     'washing_liquid_list.php' => 'view_washing_checksheets.php',
     'subassy_list.php'        => 'view_subassy_checksheets.php',
     'fopump_list.php'         => 'view_fopump_checksheets.php',
+    'bakeoven_list.php'       => 'view_bakeoven_checksheets.php',
 ];
 $view_href = $base_url . ($sectionViewMap[$_SESSION['section_route'] ?? ''] ?? ($is_assy_context ? 'view_assy_checksheets.php' : 'view_checksheets.php'));
 $current_route = $_SESSION['section_route'] ?? '';
 $is_washing_section = $current_route === 'washing_liquid_list.php';
-// Monthly-log sections (Washing, Sub Assembly) share the same UX:
-// no per-sheet drafts, and only the "Checked By" master data applies.
-$is_monthly_monitor = in_array($current_route, ['washing_liquid_list.php', 'subassy_list.php', 'fopump_list.php'], true);
+// Monthly-log sections (Washing, Sub Assembly, FO Pump Assy, Bake Oven)
+// share the same UX: no per-sheet drafts, and only the "Checked By"
+// master data applies.
+$is_monthly_monitor = in_array($current_route, ['washing_liquid_list.php', 'subassy_list.php', 'fopump_list.php', 'bakeoven_list.php'], true);
 $drafts_href = $base_url . ($is_monthly_monitor
     ? 'soon.php?feature=My+Drafts+(not+applicable+to+this+check+sheet)'
     : ($is_assy_context ? 'my_assy_drafts.php' : 'my_drafts.php'));
@@ -103,13 +105,16 @@ function icon(string $name): string
         </div>
         <div class="nav-submenu <?= $config_active ? 'open' : '' ?>" id="config-submenu">
             <?php if ($is_monthly_monitor): ?>
+                <a class="nav-subitem <?= $active_nav === 'config-checked-by-view' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checked_by.php">Checked By</a>
                 <a class="nav-subitem <?= $active_nav === 'config-guide' ? 'active' : '' ?>" href="<?= $base_url ?>admin/check_guides.php">Checking Guide</a>
             <?php elseif ($is_assy_context): ?>
                 <a class="nav-subitem <?= $active_nav === 'config-assy-model' ? 'active' : '' ?>" href="<?= $base_url ?>admin/assy_models.php">Model</a>
                 <a class="nav-subitem <?= $active_nav === 'config-assy-checklist' ? 'active' : '' ?>" href="<?= $base_url ?>admin/assy_checklist_items.php">Checking Item</a>
+                <a class="nav-subitem <?= $active_nav === 'config-checked-by-view' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checked_by.php">Checked By</a>
             <?php else: ?>
                 <a class="nav-subitem <?= $active_nav === 'config-condition' ? 'active' : '' ?>" href="<?= $base_url ?>admin/conditions.php">Condition</a>
                 <a class="nav-subitem <?= $active_nav === 'config-checklist' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checklist_items.php">Checking Item</a>
+                <a class="nav-subitem <?= $active_nav === 'config-checked-by-view' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checked_by.php">Checked By</a>
                 <a class="nav-subitem <?= $active_nav === 'config-shift' ? 'active' : '' ?>" href="<?= $base_url ?>admin/master.php?type=shift">Shift</a>
             <?php endif; ?>
             <div class="nav-subdivider"></div>

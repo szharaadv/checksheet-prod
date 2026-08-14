@@ -28,18 +28,18 @@ require_once __DIR__ . '/includes/auth.php';
 require_section_access($pdo, (int) $department['id'], 'subassy_list.php');
 
 // Checked By entries scoped strictly to this section — keeps Sub
-// Assembly's Foreman/Supervisor lists from mixing with Torque/Washing/FO
+// Assembly's Operator/Supervisor lists from mixing with Torque/Washing/FO
 // Pump Assy's, which share the same department_id. Routing lives entirely
 // in admin/users.php now; unassigned m_checker rows are stale leftovers,
 // not a fallback to show here.
 $stmt = $pdo->prepare(
     "SELECT c.* FROM m_checker c
-     WHERE c.department_id = ? AND c.is_active = 1 AND c.role = 'foreman'
+     WHERE c.department_id = ? AND c.is_active = 1 AND c.role = 'operator'
        AND c.section_id = (SELECT id FROM m_checksheet_section WHERE department_id = ? AND route = 'subassy_list.php')
      ORDER BY c.name"
 );
 $stmt->execute([$department['id'], $department['id']]);
-$foremen = $stmt->fetchAll();
+$operators = $stmt->fetchAll();
 
 $stmt = $pdo->prepare(
     "SELECT c.* FROM m_checker c
@@ -114,7 +114,7 @@ require __DIR__ . '/includes/app_top.php';
                     <?php foreach ($checkCols as $label): ?>
                         <th><?= htmlspecialchars($label) ?><br><small>V = OK / X = NG</small></th>
                     <?php endforeach; ?>
-                    <th>Checker<br><small>Foreman</small></th>
+                    <th>Checker<br><small>Operator</small></th>
                     <th>Control<br><small>Supervisor</small></th>
                 </tr>
             </thead>
@@ -141,7 +141,7 @@ require __DIR__ . '/includes/app_top.php';
                     <td>
                         <select class="w-select" data-day="<?= $day ?>" data-field="checker_id" <?= $dis ?>>
                             <option value="">-</option>
-                            <?php foreach ($foremen as $c): ?>
+                            <?php foreach ($operators as $c): ?>
                                 <option value="<?= $c['id'] ?>" <?= ($e['checker_id'] ?? null) == $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
