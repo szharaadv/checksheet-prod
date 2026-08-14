@@ -17,6 +17,10 @@ $sections = $pdo->query(
      WHERE s.is_active = 1 ORDER BY d.sort_order, s.sort_order'
 )->fetchAll();
 $sectionIds = array_column($sections, 'id');
+$sectionsById = [];
+foreach ($sections as $s) {
+    $sectionsById[$s['id']] = $s;
+}
 
 $error = null;
 
@@ -49,6 +53,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
                     $ins->execute([$userId, $sid]);
                 }
             }
+
+            // Make Checked By (m_checker) reflect this person's section
+            // routing: for every section they're now assigned to, make sure
+            // a matching Checked By entry exists — claiming an existing
+            // unassigned entry for the same name/department first (so we
+            // don't create a duplicate), otherwise creating a fresh row.
+            // Sections un-checked here are left alone rather than deleted,
+            // since a Checked By row may already be referenced by past
+            // checksheets.
+            foreach ($selectedSectionIds as $sid) {
+                $sec = $sectionsById[$sid];
+                $deptId = (int) $sec['department_id'];
+
+                $stmt = $pdo->prepare('SELECT id FROM m_checker WHERE name = ? AND section_id = ?');
+                $stmt->execute([$name, $sid]);
+                $checkerId = $stmt->fetchColumn();
+
+                if ($checkerId) {
+                    $pdo->prepare('UPDATE m_checker SET role = ? WHERE id = ?')->execute([$checkerRole, $checkerId]);
+                    continue;
+                }
+
+                $stmt = $pdo->prepare('SELECT id FROM m_checker WHERE name = ? AND department_id = ? AND section_id IS NULL LIMIT 1');
+                $stmt->execute([$name, $deptId]);
+                $unassignedId = $stmt->fetchColumn();
+
+                if ($unassignedId) {
+                    $pdo->prepare('UPDATE m_checker SET section_id = ?, role = ? WHERE id = ?')->execute([$sid, $checkerRole, $unassignedId]);
+                } else {
+                    $pdo->prepare('INSERT INTO m_checker (department_id, section_id, name, role) VALUES (?, ?, ?, ?)')->execute([$deptId, $sid, $name, $checkerRole]);
+                }
+            }
+
             $pdo->commit();
             header('Location: users.php?saved=1');
             exit;
