@@ -16,6 +16,55 @@
     margin-bottom: 24px;
 }
 
+.admin-form-title { margin: 0 0 4px; font: 600 15px Inter, sans-serif; color: #1f2430; }
+.admin-form-hint { margin: 0 0 14px; color: #8b93a1; font-size: 12.5px; }
+
+/* Edit popup: rendered server-side only when an item is being edited — no JS needed. */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 22, 26, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 1000;
+}
+
+.modal-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 22px 24px;
+    width: 100%;
+    max-width: 880px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.modal-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.modal-card-header h3 { margin: 0; font: 600 16px Inter, sans-serif; color: #1f2430; }
+
+.modal-close {
+    color: #8b93a1;
+    font-size: 22px;
+    line-height: 1;
+    text-decoration: none;
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+.modal-close:hover { background: #f4f5f7; color: #1f2430; }
+
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
 .form-row {
     display: flex;
     flex-direction: column;
@@ -62,6 +111,14 @@
     border-radius: 6px;
     border: 1px solid #e6e8ec;
 }
+
+/* No internal scrollbox — the table just grows with its content and the page
+ * scrolls normally, so it also sizes correctly at any browser zoom level
+ * instead of being clipped to a fixed viewport-relative height. overflow
+ * must be reset (not just max-height) because overflow:auto + auto height
+ * collapses the container when it holds a position:sticky table header. */
+.table-scroll-natural { max-height: none; overflow: visible; }
+.table-scroll-natural .admin-table th { position: static; }
 
 .admin-table {
     width: 100%;

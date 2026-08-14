@@ -33,6 +33,20 @@ $stmt->execute([$id]);
 $details = $stmt->fetchAll();
 
 $backHref = 'view_checksheets.php' . (isset($_GET['back']) && $_GET['back'] !== '' ? '?' . $_GET['back'] : '');
+$backQuery = isset($_GET['back']) && $_GET['back'] !== '' ? '&back=' . $_GET['back'] : '';
+
+// Next report for the same department + condition, chronologically (by date, then time).
+$stmt = $pdo->prepare(
+    'SELECT id FROM t_checksheet_header
+     WHERE department_id = ? AND condition_id = ?
+       AND (tanggal > ? OR (tanggal = ? AND (jam > ? OR (jam = ? AND id > ?))))
+     ORDER BY tanggal ASC, jam ASC, id ASC LIMIT 1'
+);
+$stmt->execute([
+    $header['department_id'], $header['condition_id'],
+    $header['tanggal'], $header['tanggal'], $header['jam'], $header['jam'], $id,
+]);
+$nextId = $stmt->fetchColumn();
 
 $base_url = '';
 $active_nav = 'view-checksheets';
@@ -44,6 +58,11 @@ require __DIR__ . '/includes/app_top.php';
 <div class="checksheet-card">
     <div class="dept-context">
         <a href="<?= htmlspecialchars($backHref) ?>" class="dept-switch-link">&larr; Back to list</a>
+        <?php if ($nextId): ?>
+            <a href="view_checksheet_detail.php?id=<?= (int) $nextId . $backQuery ?>" class="dept-switch-link dept-switch-link-next">Next &rarr;</a>
+        <?php else: ?>
+            <span class="dept-switch-link dept-switch-link-disabled dept-switch-link-next">Next &rarr;</span>
+        <?php endif; ?>
     </div>
 
     <div class="form-grid-top">

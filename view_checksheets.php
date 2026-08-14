@@ -2,24 +2,27 @@
 require_once __DIR__ . '/config/db.php';
 $pdo = get_db();
 
-$departments = $pdo->query('SELECT * FROM m_department ORDER BY sort_order, id')->fetchAll();
+// This page only ever shows Painting checksheets (t_checksheet_header is not
+// used by any other section), so the department is fixed rather than a
+// filter the user has to think about.
+$department = $pdo->query("SELECT * FROM m_department WHERE LOWER(name) = 'painting' LIMIT 1")->fetch();
+$selected_department_id = $department ? (int) $department['id'] : 0;
 
-$selected_department_id = (int)($_GET['department_id'] ?? ($_SESSION['department_id'] ?? 0));
-
-if ($selected_department_id) {
-    $stmt = $pdo->prepare('SELECT * FROM m_condition WHERE department_id = ? ORDER BY sort_order, id');
-    $stmt->execute([$selected_department_id]);
-} else {
-    $stmt = $pdo->query('SELECT * FROM m_condition ORDER BY sort_order, id');
-}
+$stmt = $pdo->prepare('SELECT * FROM m_condition WHERE department_id = ? ORDER BY sort_order, id');
+$stmt->execute([$selected_department_id]);
 $conditions = $stmt->fetchAll();
 
 $selected_condition_id = (int)($_GET['condition_id'] ?? 0);
-$date_from = $_GET['date_from'] ?? date('Y-m-d');
-$date_to = $_GET['date_to'] ?? date('Y-m-d');
+
+$month = (int)($_GET['month'] ?? date('n'));
+$year = (int)($_GET['year'] ?? date('Y'));
+$month = max(1, min(12, $month));
+$daysInMonth = (int) date('t', mktime(0, 0, 0, $month, 1, $year));
+$monthStart = sprintf('%04d-%02d-01', $year, $month);
+$monthEnd = sprintf('%04d-%02d-%02d', $year, $month, $daysInMonth);
 
 $where = ["h.status = 'submitted'", 'h.tanggal BETWEEN ? AND ?'];
-$params = [$date_from, $date_to];
+$params = [$monthStart, $monthEnd];
 
 if ($selected_department_id) {
     $where[] = 'h.department_id = ?';
@@ -30,45 +33,82 @@ if ($selected_condition_id) {
     $params[] = $selected_condition_id;
 }
 
-$sql = 'SELECT h.*, d.name AS department_name, c.name AS condition_name, ck.name AS checker_name, s.name AS shift_name
+$sql = 'SELECT h.*, d.name AS department_name, c.name AS condition_name, ck.name AS checker_name, s.name AS shift_name,
+               (SELECT COUNT(*) FROM t_checksheet_detail x WHERE x.header_id = h.id) AS item_count,
+               (SELECT COUNT(*) FROM t_checksheet_detail x WHERE x.header_id = h.id AND x.category = \'Abnormal\') AS abnormal_count,
+               (SELECT COUNT(*) FROM t_checksheet_detail x WHERE x.header_id = h.id AND x.category = \'Sudah Diperbaiki\') AS fixed_count
         FROM t_checksheet_header h
         JOIN m_department d ON d.id = h.department_id
         JOIN m_condition c ON c.id = h.condition_id
         JOIN m_checker ck ON ck.id = h.checker_id
         JOIN m_shift s ON s.id = h.shift_id
         WHERE ' . implode(' AND ', $where) . '
-        ORDER BY h.tanggal DESC, h.jam DESC, h.id DESC';
+        ORDER BY h.tanggal DESC, h.jam ASC, h.id ASC';
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $results = $stmt->fetchAll();
+
+// Group rows sharing the same Department + Date + Time into one card — each
+// Condition is still its own underlying checksheet (own header/detail rows,
+// own "View" link), only the list display combines them. Rows with a
+// different Jam are never merged. Insertion order follows $results, which is
+// already sorted tanggal DESC, jam DESC, id DESC.
+$groups = [];
+foreach ($results as $row) {
+    $key = $row['department_id'] . '|' . $row['tanggal'] . '|' . $row['jam'];
+    if (!isset($groups[$key])) {
+        $groups[$key] = [
+            'tanggal' => $row['tanggal'],
+            'jam' => $row['jam'],
+            'department_name' => $row['department_name'],
+            'items' => [],
+            'abnormal_total' => 0,
+        ];
+    }
+    $groups[$key]['items'][] = $row;
+    $groups[$key]['abnormal_total'] += (int) $row['abnormal_count'];
+}
+
+// If every Condition in a group was checked by the same person on the same
+// shift (the common case), show that once at the group level instead of
+// repeating it on every row — keeps the trail scannable at a glance.
+foreach ($groups as &$g) {
+    $checkers = array_unique(array_column($g['items'], 'checker_name'));
+    $shifts = array_unique(array_column($g['items'], 'shift_name'));
+    $g['uniform_checker'] = count($checkers) === 1 ? $checkers[0] : null;
+    $g['uniform_shift'] = count($shifts) === 1 ? $shifts[0] : null;
+}
+unset($g);
 
 $backQuery = $_SERVER['QUERY_STRING'] ?? '';
 
 $base_url = '';
 $active_nav = 'view-checksheets';
 $page_title = 'View Checksheets';
-$page_subtitle = 'Search & view submitted checksheet results';
+$page_subtitle = 'Painting · Search & view submitted checksheet results';
 require __DIR__ . '/includes/app_top.php';
 ?>
 
 <form method="get" class="admin-form filter-bar">
+    <input type="hidden" name="department_id" value="<?= $selected_department_id ?>">
     <div class="form-grid">
         <div class="form-row">
-            <label>Date From</label>
-            <input type="date" name="date_from" value="<?= htmlspecialchars($date_from) ?>">
-        </div>
-        <div class="form-row">
-            <label>Date To</label>
-            <input type="date" name="date_to" value="<?= htmlspecialchars($date_to) ?>">
-        </div>
-        <div class="form-row">
-            <label>Department</label>
-            <select name="department_id">
-                <option value="0">All Departments</option>
-                <?php foreach ($departments as $d): ?>
-                    <option value="<?= $d['id'] ?>" <?= $d['id'] == $selected_department_id ? 'selected' : '' ?>><?= htmlspecialchars($d['name']) ?></option>
+            <label>Month</label>
+            <select name="month">
+                <?php
+                $monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+                foreach ($monthNames as $i => $mName): ?>
+                    <option value="<?= $i + 1 ?>" <?= ($i + 1) == $month ? 'selected' : '' ?>><?= $mName ?></option>
                 <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="form-row">
+            <label>Year</label>
+            <select name="year">
+                <?php for ($y = date('Y') - 2; $y <= date('Y') + 1; $y++): ?>
+                    <option value="<?= $y ?>" <?= $y == $year ? 'selected' : '' ?>><?= $y ?></option>
+                <?php endfor; ?>
             </select>
         </div>
         <div class="form-row">
@@ -87,21 +127,53 @@ require __DIR__ . '/includes/app_top.php';
 </form>
 
 <div class="cs-card-list">
-    <?php foreach ($results as $row): ?>
-    <div class="cs-card">
+    <?php foreach ($groups as $g): ?>
+    <div class="cs-card cs-card-group">
         <div class="cs-card-date">
-            <div class="cs-card-day"><?= htmlspecialchars(date('d', strtotime($row['tanggal']))) ?></div>
-            <div class="cs-card-month"><?= htmlspecialchars(date('M', strtotime($row['tanggal']))) ?></div>
+            <div class="cs-card-day"><?= htmlspecialchars(date('d', strtotime($g['tanggal']))) ?></div>
+            <div class="cs-card-month"><?= htmlspecialchars(date('M', strtotime($g['tanggal']))) ?></div>
         </div>
         <div class="cs-card-body">
-            <div class="cs-card-title"><?= htmlspecialchars($row['department_name']) ?> &middot; <?= htmlspecialchars($row['condition_name']) ?></div>
-            <div class="cs-card-meta">Checked by <?= htmlspecialchars($row['checker_name']) ?> &middot; <?= htmlspecialchars($row['shift_name']) ?> &middot; <?= htmlspecialchars(substr($row['jam'], 0, 5)) ?></div>
+            <div class="cs-card-head-row">
+                <div>
+                    <div class="cs-card-title"><?= htmlspecialchars(substr($g['jam'], 0, 5)) ?></div>
+                    <div class="cs-card-meta">
+                        <?= count($g['items']) ?> condition<?= count($g['items']) > 1 ? 's' : '' ?> checked
+                        <?php if ($g['uniform_checker']): ?> &middot; Checked by <?= htmlspecialchars($g['uniform_checker']) ?><?php endif; ?>
+                        <?php if ($g['uniform_shift']): ?> &middot; <?= htmlspecialchars($g['uniform_shift']) ?><?php endif; ?>
+                    </div>
+                </div>
+                <?php if ($g['abnormal_total'] > 0): ?>
+                    <span class="cs-summary-badge cs-summary-badge-abnormal"><?= $g['abnormal_total'] ?> abnormal</span>
+                <?php else: ?>
+                    <span class="cs-summary-badge cs-summary-badge-ok">All normal</span>
+                <?php endif; ?>
+            </div>
+            <div class="cs-condition-list">
+                <?php foreach ($g['items'] as $row): ?>
+                    <div class="cs-condition-row">
+                        <span class="cs-condition-name"><?= htmlspecialchars($row['condition_name']) ?></span>
+                        <span class="cs-condition-meta">
+                            <?= (int) $row['item_count'] ?> item<?= (int) $row['item_count'] !== 1 ? 's' : '' ?>
+                            <?php if (!$g['uniform_checker'] || !$g['uniform_shift']): ?>
+                                &middot; <?= htmlspecialchars($row['checker_name']) ?> &middot; <?= htmlspecialchars($row['shift_name']) ?>
+                            <?php endif; ?>
+                        </span>
+                        <?php if ((int) $row['abnormal_count'] > 0): ?>
+                            <span class="cs-row-badge cs-row-badge-abnormal"><?= (int) $row['abnormal_count'] ?> abnormal</span>
+                        <?php elseif ((int) $row['fixed_count'] > 0): ?>
+                            <span class="cs-row-badge cs-row-badge-fixed"><?= (int) $row['fixed_count'] ?> fixed</span>
+                        <?php else: ?>
+                            <span class="cs-row-badge cs-row-badge-ok">Normal</span>
+                        <?php endif; ?>
+                        <a href="view_checksheet_detail.php?id=<?= $row['id'] ?>&back=<?= urlencode($backQuery) ?>" class="cs-view-btn-sm">View &rarr;</a>
+                    </div>
+                <?php endforeach; ?>
+            </div>
         </div>
-        <span class="cs-status cs-status-submitted">Submitted</span>
-        <a href="view_checksheet_detail.php?id=<?= $row['id'] ?>&back=<?= urlencode($backQuery) ?>" class="cs-view-btn">View &rarr;</a>
     </div>
     <?php endforeach; ?>
-    <?php if (!$results): ?><div class="empty-state">No checksheets found for this date range / filter.</div><?php endif; ?>
+    <?php if (!$groups): ?><div class="empty-state">No checksheets found for this date range / filter.</div><?php endif; ?>
 </div>
 
 <?php require __DIR__ . '/includes/app_bottom.php'; ?>

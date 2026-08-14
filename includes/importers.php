@@ -624,6 +624,7 @@ function painting_aliases(): array
         'actual_result' => ['actual result', 'actual_result', 'actual'],
         'category'      => ['category', 'kategori'],
         'checker'       => ['checked by :', 'checked by', 'checker'],
+        'tank_tube'     => ['tank/tube', 'tank_tube'],
     ];
 }
 
@@ -642,6 +643,7 @@ function import_painting(PDO $pdo, int $dept, array $rows): array
             'actual_result' => import_val($r, $A['actual_result']),
             'category'      => import_val($r, $A['category']),
             'checker'       => import_val($r, $A['checker']),
+            'tank_tube'     => import_val($r, $A['tank_tube']),
         ];
     }
     unset($r);
@@ -706,6 +708,19 @@ function import_painting(PDO $pdo, int $dept, array $rows): array
             if ($item === '') continue;
             $selItem->execute([$cond_id, $item]);
             $iid = (int)$selItem->fetchColumn();
+            if (!$iid) {
+                // Some checklist items are distinguished by a "(Line N)" suffix in
+                // their master-data name, while exported data instead carries that
+                // distinction in the Tank/Tube column (e.g. Water Daily Phosphate:
+                // "Total Acid Phosphate" + Tank/Tube "1" == master item
+                // "Total Acid Phosphate (Line 1)"). Retry with that suffix before
+                // giving up.
+                $tankTube = trim((string) ($rr['data']['tank_tube'] ?? ''));
+                if ($tankTube !== '') {
+                    $selItem->execute([$cond_id, "$item (Line $tankTube)"]);
+                    $iid = (int) $selItem->fetchColumn();
+                }
+            }
             if (!$iid) { $res['errors'][] = "Row {$rr['_line']}: checking_item '$item' not found for condition '{$first['condition']}' (skipped)."; continue; }
             $insD->execute([$hid, $iid, import_nz($rr['data']['actual_result'] ?? ''), import_nz($rr['data']['category'] ?? '')]);
         }

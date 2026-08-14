@@ -15,6 +15,18 @@ $stmt = $pdo->query(
 );
 $allSections = array_filter($stmt->fetchAll(), fn($s) => isset($registry[$s['route']]));
 
+// Scope the Section list to whichever department the user currently has open
+// (tracked the same way the rest of the app does, via session) — e.g. only
+// show Painting's import option while working in Painting, or only the
+// Assembling sections while working in Assembling. Falls back to every
+// section if there's no department in session yet (e.g. landing here fresh).
+if (!empty($_SESSION['department_id'])) {
+    $scopedSections = array_values(array_filter($allSections, fn($s) => $s['department_id'] == $_SESSION['department_id']));
+    if ($scopedSections) {
+        $allSections = $scopedSections;
+    }
+}
+
 $selected_section_id = (int)($_GET['section_id'] ?? ($_POST['section_id'] ?? 0));
 // Default to the section the user currently has open (contextual).
 if (!$selected_section_id && !empty($_SESSION['section_route'])) {

@@ -3,6 +3,24 @@
  * Shared helpers for CSV data import (migrating PowerApps data in).
  */
 
+/**
+ * Sniff the field delimiter from a CSV's first line. Handles the common case
+ * of a CSV saved by a non-English-locale Excel (e.g. Indonesian), which
+ * defaults to ';' instead of ',' as the list separator.
+ */
+function csv_detect_delimiter(string $firstLine): string
+{
+    $firstLine = preg_replace('/^\xEF\xBB\xBF/', '', $firstLine);
+    $candidates = [',', ';', "\t"];
+    $best = ',';
+    $bestCount = 0;
+    foreach ($candidates as $d) {
+        $count = substr_count($firstLine, $d);
+        if ($count > $bestCount) { $bestCount = $count; $best = $d; }
+    }
+    return $best;
+}
+
 /** Read a CSV file into rows of assoc arrays keyed by normalised header names. */
 function csv_read(string $path): array
 {
@@ -10,11 +28,27 @@ function csv_read(string $path): array
     if (($h = fopen($path, 'r')) === false) {
         return $rows;
     }
-    // Strip UTF-8 BOM if present on the first field.
+
+    // Skip a UTF-8 BOM at the very start of the file, *before* fgetcsv reads
+    // it — otherwise a quoted header like "Condition" gets parsed as the
+    // literal string `"Condition"` (quotes included), since fgetcsv only
+    // strips quotes when the quote character is the very first byte of that
+    // field. A leading BOM byte in front of the quote silently breaks that,
+    // which made every column fail to match (header keys ended up as
+    // '"condition"' instead of 'condition') and the whole file get skipped.
+    if (fread($h, 3) !== "\xEF\xBB\xBF") {
+        rewind($h);
+    }
+
+    $startPos = ftell($h);
+    $firstLine = fgets($h);
+    if ($firstLine === false) { fclose($h); return $rows; }
+    $delimiter = csv_detect_delimiter($firstLine);
+    fseek($h, $startPos);
+
     $header = null;
-    while (($data = fgetcsv($h, 0, ',')) !== false) {
+    while (($data = fgetcsv($h, 0, $delimiter)) !== false) {
         if ($header === null) {
-            $data[0] = preg_replace('/^\xEF\xBB\xBF/', '', $data[0] ?? '');
             $header = array_map(fn($c) => strtolower(trim((string)$c)), $data);
             continue;
         }

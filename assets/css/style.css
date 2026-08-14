@@ -443,6 +443,70 @@
 .cs-view-btn:hover { background: #f5f6f8; }
 
 .cs-card-actions { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+
+/* Grouped card: multiple Conditions sharing the same Date + Time (Painting). */
+.cs-card-group { align-items: flex-start; }
+.cs-card-head-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+.cs-condition-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 14px;
+}
+.cs-condition-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid transparent;
+}
+.cs-condition-name { font-weight: 600; font-size: 13.5px; color: #181a1e; flex-shrink: 0; width: 150px; }
+.cs-condition-meta { font-size: 12px; color: #8b93a1; flex: 1; min-width: 0; }
+
+.cs-summary-badge {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.cs-summary-badge-ok { background: #e4f3e5; color: #3f7d43; }
+.cs-summary-badge-abnormal { background: #fbeae7; color: #b8382a; }
+
+.cs-row-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.cs-row-badge-ok { background: #eef0f2; color: #6b7280; }
+.cs-row-badge-abnormal { background: #fbeae7; color: #b8382a; }
+.cs-row-badge-fixed { background: #faf1de; color: #a5711a; }
+
+.cs-condition-row:has(.cs-row-badge-abnormal) { background: #fdf5f4; border-color: #f6d9d4; }
+.cs-view-btn-sm {
+    background: #fff;
+    border: 1px solid #d7dbe2;
+    color: #4a5262;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.cs-view-btn-sm:hover { background: #eef0f2; }
 .cs-delete-link {
     font-size: 13px;
     font-weight: 600;

@@ -38,13 +38,15 @@ function handle_upload(string $field, array $allowed, string $dir, string $web):
     return $web . '/' . $name;
 }
 
-$sections = $pdo->query(
+// The Checking Guide feature (photo-illustrated part/checking-item guide) is
+// only used by Sub Assembly — there's no need for a Section picker here.
+$section = $pdo->query(
     "SELECT s.id, s.name, d.name AS dept_name
      FROM m_checksheet_section s
      JOIN m_department d ON d.id = s.department_id
-     WHERE s.is_active = 1
-     ORDER BY d.sort_order, s.sort_order"
-)->fetchAll();
+     WHERE s.route = 'subassy_list.php' AND s.is_active = 1
+     LIMIT 1"
+)->fetch();
 
 $error = null;
 
@@ -165,7 +167,7 @@ if (($_GET['action'] ?? '') === 'delete_guide' && isset($_GET['section_id'])) {
     exit;
 }
 
-$selected_section_id = (int)($_GET['section_id'] ?? ($sections[0]['id'] ?? 0));
+$selected_section_id = $section ? (int) $section['id'] : 0;
 
 $stmt = $pdo->prepare('SELECT * FROM m_check_guide WHERE section_id = ?');
 $stmt->execute([$selected_section_id]);
@@ -196,16 +198,10 @@ require __DIR__ . '/../includes/app_top.php';
 <?php if (isset($_GET['saved'])): ?><div class="alert alert-ok">Data saved.</div><?php endif; ?>
 <?php if (isset($_GET['deleted'])): ?><div class="alert alert-ok">Item deleted.</div><?php endif; ?>
 
-<form method="get" class="filter-form">
-    <label>Section:</label>
-    <select name="section_id" onchange="this.form.submit()">
-        <?php foreach ($sections as $s): ?>
-            <option value="<?= $s['id'] ?>" <?= $s['id'] == $selected_section_id ? 'selected' : '' ?>>
-                <?= htmlspecialchars($s['dept_name'] . ' · ' . $s['name']) ?>
-            </option>
-        <?php endforeach; ?>
-    </select>
-</form>
+<p style="margin:0 0 18px;color:#8b93a1;font-size:13px;">
+    Section: <strong style="color:#1f2430;"><?= $section ? htmlspecialchars($section['dept_name'] . ' · ' . $section['name']) : '—' ?></strong>
+    <span style="color:#c2c7cf;">(Checking Guide is only used by Sub Assembly)</span>
+</p>
 
 <h3 style="margin:18px 0 8px;font:600 15px Inter,sans-serif;">Guide Header</h3>
 <form method="post" class="admin-form" enctype="multipart/form-data">
@@ -287,7 +283,7 @@ require __DIR__ . '/../includes/app_top.php';
     </div>
 </form>
 
-<div class="table-scroll">
+<div class="table-scroll table-scroll-natural">
 <table class="admin-table">
     <thead>
         <tr>

@@ -95,6 +95,79 @@ $stmt = $pdo->prepare('SELECT * FROM m_checklist_item WHERE condition_id = ? ORD
 $stmt->execute([$selected_condition_id]);
 $items = $stmt->fetchAll();
 
+/** Shared field grid for both the inline "Add" form and the "Edit" popup — keeps them in sync. */
+function render_checklist_item_fields(?array $row, array $conditions, int $defaultConditionId, int $defaultSortOrder): void
+{
+    $v = fn($key, $default = '') => htmlspecialchars($row[$key] ?? $default);
+    ?>
+    <div class="form-grid">
+        <div class="form-row">
+            <label>Condition</label>
+            <select name="condition_id" required>
+                <?php foreach ($conditions as $c): ?>
+                    <option value="<?= $c['id'] ?>" <?= $c['id'] == ($row['condition_id'] ?? $defaultConditionId) ? 'selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div class="form-row">
+            <label>Checking Item</label>
+            <input type="text" name="checking_item" value="<?= $v('checking_item') ?>" required>
+        </div>
+
+        <div class="form-row">
+            <label>Checking Method</label>
+            <input type="text" name="metode_pengecekan" value="<?= $v('metode_pengecekan', 'Visual') ?>">
+        </div>
+
+        <div class="form-row">
+            <label>Standard Min.</label>
+            <input type="text" name="standard_min" value="<?= $v('standard_min') ?>">
+        </div>
+
+        <div class="form-row">
+            <label>Standard Max.</label>
+            <input type="text" name="standard_max" value="<?= $v('standard_max') ?>">
+        </div>
+
+        <div class="form-row">
+            <label>Tank/Tube</label>
+            <input type="text" name="tank_tube" value="<?= $v('tank_tube', '-') ?>">
+        </div>
+
+        <div class="form-row">
+            <label>Unit</label>
+            <input type="text" name="satuan" value="<?= $v('satuan', '-') ?>">
+        </div>
+
+        <div class="form-row">
+            <label>Actual Result Input Type</label>
+            <select name="actual_input_type">
+                <?php $curType = $row['actual_input_type'] ?? 'number'; ?>
+                <option value="number" <?= $curType === 'number' ? 'selected' : '' ?>>Number</option>
+                <option value="text" <?= $curType === 'text' ? 'selected' : '' ?>>Free Text</option>
+                <option value="select" <?= $curType === 'select' ? 'selected' : '' ?>>Dropdown</option>
+            </select>
+        </div>
+
+        <div class="form-row">
+            <label>Dropdown Options (comma separated)</label>
+            <input type="text" name="actual_options" placeholder="e.g. Not Leaking,Leaking" value="<?= $v('actual_options') ?>">
+        </div>
+
+        <div class="form-row">
+            <label>Category Options (comma separated)</label>
+            <input type="text" name="category_options" value="<?= $v('category_options', 'OK,NG') ?>">
+        </div>
+
+        <div class="form-row">
+            <label>Order</label>
+            <input type="number" name="sort_order" value="<?= $v('sort_order', (string) $defaultSortOrder) ?>">
+        </div>
+    </div>
+    <?php
+}
+
 $base_url = '../';
 $active_nav = 'config-checklist';
 $page_title = 'Checking Item';
@@ -122,82 +195,37 @@ require __DIR__ . '/../includes/app_top.php';
     </select>
 </form>
 
-<form method="post" class="admin-form checklist-form">
-    <input type="hidden" name="action" value="save">
-    <input type="hidden" name="id" value="<?= htmlspecialchars($editRow['id'] ?? '') ?>">
-
-    <div class="form-grid">
+<div class="admin-form checklist-form">
+    <h3 class="admin-form-title">Add Checking Item</h3>
+    <p class="admin-form-hint">Adding for department: <?= htmlspecialchars($departments[array_search($selected_department_id, array_column($departments, 'id'))]['name'] ?? '') ?>. Change the Department filter above to pick a condition from another department.</p>
+    <form method="post">
+        <input type="hidden" name="action" value="save">
+        <?php render_checklist_item_fields(null, $conditions, $selected_condition_id, count($items) + 1); ?>
         <div class="form-row">
-            <label>Condition</label>
-            <select name="condition_id" required>
-                <?php foreach ($conditions as $c): ?>
-                    <option value="<?= $c['id'] ?>" <?= $c['id'] == ($editRow['condition_id'] ?? $selected_condition_id) ? 'selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <small>Adding for department: <?= htmlspecialchars($departments[array_search($selected_department_id, array_column($departments, 'id'))]['name'] ?? '') ?>. Change the Department filter above to pick a condition from another department.</small>
+            <button type="submit" class="btn">Add</button>
         </div>
+    </form>
+</div>
 
-        <div class="form-row">
-            <label>Checking Item</label>
-            <input type="text" name="checking_item" value="<?= htmlspecialchars($editRow['checking_item'] ?? '') ?>" required>
+<?php if ($editRow): $cancelHref = "checklist_items.php?department_id=$selected_department_id&condition_id=$selected_condition_id"; ?>
+<div class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-card-header">
+            <h3>Edit Checking Item</h3>
+            <a href="<?= htmlspecialchars($cancelHref) ?>" class="modal-close" aria-label="Close">&times;</a>
         </div>
-
-        <div class="form-row">
-            <label>Checking Method</label>
-            <input type="text" name="metode_pengecekan" value="<?= htmlspecialchars($editRow['metode_pengecekan'] ?? 'Visual') ?>">
-        </div>
-
-        <div class="form-row">
-            <label>Standard Min.</label>
-            <input type="text" name="standard_min" value="<?= htmlspecialchars($editRow['standard_min'] ?? '') ?>">
-        </div>
-
-        <div class="form-row">
-            <label>Standard Max.</label>
-            <input type="text" name="standard_max" value="<?= htmlspecialchars($editRow['standard_max'] ?? '') ?>">
-        </div>
-
-        <div class="form-row">
-            <label>Tank/Tube</label>
-            <input type="text" name="tank_tube" value="<?= htmlspecialchars($editRow['tank_tube'] ?? '-') ?>">
-        </div>
-
-        <div class="form-row">
-            <label>Unit</label>
-            <input type="text" name="satuan" value="<?= htmlspecialchars($editRow['satuan'] ?? '-') ?>">
-        </div>
-
-        <div class="form-row">
-            <label>Actual Result Input Type</label>
-            <select name="actual_input_type">
-                <?php $curType = $editRow['actual_input_type'] ?? 'number'; ?>
-                <option value="number" <?= $curType === 'number' ? 'selected' : '' ?>>Number</option>
-                <option value="text" <?= $curType === 'text' ? 'selected' : '' ?>>Free Text</option>
-                <option value="select" <?= $curType === 'select' ? 'selected' : '' ?>>Dropdown</option>
-            </select>
-        </div>
-
-        <div class="form-row">
-            <label>Dropdown Options (comma separated)</label>
-            <input type="text" name="actual_options" placeholder="e.g. Not Leaking,Leaking" value="<?= htmlspecialchars($editRow['actual_options'] ?? '') ?>">
-        </div>
-
-        <div class="form-row">
-            <label>Category Options (comma separated)</label>
-            <input type="text" name="category_options" value="<?= htmlspecialchars($editRow['category_options'] ?? 'OK,NG') ?>">
-        </div>
-
-        <div class="form-row">
-            <label>Order</label>
-            <input type="number" name="sort_order" value="<?= htmlspecialchars($editRow['sort_order'] ?? (count($items) + 1)) ?>">
-        </div>
+        <form method="post">
+            <input type="hidden" name="action" value="save">
+            <input type="hidden" name="id" value="<?= htmlspecialchars($editRow['id']) ?>">
+            <?php render_checklist_item_fields($editRow, $conditions, $selected_condition_id, (int) $editRow['sort_order']); ?>
+            <div class="form-row modal-actions">
+                <a href="<?= htmlspecialchars($cancelHref) ?>" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn">Update</button>
+            </div>
+        </form>
     </div>
-
-    <div class="form-row">
-        <button type="submit" class="btn"><?= $editRow ? 'Update' : 'Add' ?></button>
-        <?php if ($editRow): ?><a href="checklist_items.php?department_id=<?= $selected_department_id ?>&condition_id=<?= $selected_condition_id ?>" class="btn btn-secondary">Cancel</a><?php endif; ?>
-    </div>
-</form>
+</div>
+<?php endif; ?>
 
 <div class="table-scroll">
 <table class="admin-table">
