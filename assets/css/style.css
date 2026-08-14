@@ -160,7 +160,16 @@
     font-size: 12.5px;
     position: sticky;
     top: 0;
+    height: 37px;
+    box-sizing: border-box;
     white-space: nowrap;
+}
+
+/* Grouped two-row headers (e.g. fopump-table): the 2nd header row must stick
+ * BELOW the 1st, not at top:0 too, otherwise both rows race to the same
+ * position and the 2nd row overlaps/jumps on top of the 1st while scrolling. */
+.assy-table thead tr:nth-child(2) th {
+    top: 37px;
 }
 
 .assy-table tbody td {
