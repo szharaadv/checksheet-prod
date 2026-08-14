@@ -111,8 +111,8 @@ if (($_GET['action'] ?? '') === 'edit_app_role' && isset($_GET['id'])) {
 }
 
 // ============================================================
-// Checked By Roles (m_checker_role) — used by admin/users.php
-// "Checked By Role" and admin/checkers.php's Role field.
+// Checked By Roles (m_checker_role) — used by admin/users.php's
+// "Checked By Role" field.
 // ============================================================
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_checker_role') {
@@ -244,7 +244,7 @@ require __DIR__ . '/../includes/app_top.php';
 
 <div class="section-head" style="margin-top: 32px;">
     <h2>Checked By Roles</h2>
-    <p>Assignable under <a href="users.php">Users</a> &middot; Checked By Role, and on <a href="checkers.php">Checked By</a> entries (e.g. Foreman, Supervisor, Operator) for the Washing Machine Liquid Monitoring / Sub Assembly / FO Pump Assy check sheets.</p>
+    <p>Assignable under <a href="users.php">Users</a> &middot; Checked By Role (e.g. Foreman, Supervisor, Operator) for the Washing Machine Liquid Monitoring / Sub Assembly / FO Pump Assy check sheets.</p>
 </div>
 
 <form method="post" class="admin-form">

@@ -3,7 +3,7 @@
  * Expects before include:
  * $base_url    - '' when included from root pages, '../' when included from admin/ pages
  * $active_nav  - one of: checksheet, config-department, config-condition,
- *                config-checklist, config-checker, config-shift,
+ *                config-checklist, config-shift,
  *                config-users, config-manage-roles, config-roles
  */
 $base_url = $base_url ?? '';
@@ -103,16 +103,13 @@ function icon(string $name): string
         </div>
         <div class="nav-submenu <?= $config_active ? 'open' : '' ?>" id="config-submenu">
             <?php if ($is_monthly_monitor): ?>
-                <a class="nav-subitem <?= $active_nav === 'config-checker' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checkers.php">Checked By</a>
                 <a class="nav-subitem <?= $active_nav === 'config-guide' ? 'active' : '' ?>" href="<?= $base_url ?>admin/check_guides.php">Checking Guide</a>
             <?php elseif ($is_assy_context): ?>
                 <a class="nav-subitem <?= $active_nav === 'config-assy-model' ? 'active' : '' ?>" href="<?= $base_url ?>admin/assy_models.php">Model</a>
                 <a class="nav-subitem <?= $active_nav === 'config-assy-checklist' ? 'active' : '' ?>" href="<?= $base_url ?>admin/assy_checklist_items.php">Checking Item</a>
-                <a class="nav-subitem <?= $active_nav === 'config-checker' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checkers.php">Checked By</a>
             <?php else: ?>
                 <a class="nav-subitem <?= $active_nav === 'config-condition' ? 'active' : '' ?>" href="<?= $base_url ?>admin/conditions.php">Condition</a>
                 <a class="nav-subitem <?= $active_nav === 'config-checklist' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checklist_items.php">Checking Item</a>
-                <a class="nav-subitem <?= $active_nav === 'config-checker' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checkers.php">Checked By</a>
                 <a class="nav-subitem <?= $active_nav === 'config-shift' ? 'active' : '' ?>" href="<?= $base_url ?>admin/master.php?type=shift">Shift</a>
             <?php endif; ?>
             <div class="nav-subdivider"></div>

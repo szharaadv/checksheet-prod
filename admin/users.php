@@ -123,10 +123,6 @@ if (($_GET['action'] ?? '') === 'edit' && isset($_GET['id'])) {
     }
 }
 
-// Coming from Checked By's "Add as User" shortcut — prefill the Add form.
-$prefillName = $editRow ? '' : trim($_GET['prefill_name'] ?? '');
-$prefillCheckerRole = $editRow ? '' : ($_GET['prefill_checker_role'] ?? '');
-
 $rows = $pdo->query('SELECT * FROM m_user ORDER BY name')->fetchAll();
 
 $allRoles = get_all_roles($pdo);
@@ -157,9 +153,8 @@ require __DIR__ . '/../includes/app_top.php';
 <?php if ($error): ?><div class="alert alert-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 <?php if (isset($_GET['saved'])): ?><div class="alert alert-ok">Data saved.</div><?php endif; ?>
 <?php if (isset($_GET['deleted'])): ?><div class="alert alert-ok">Data deleted.</div><?php endif; ?>
-<?php if ($prefillName): ?><div class="alert alert-ok">Adding <?= htmlspecialchars($prefillName) ?> from Checked By — pick their App Role and sections below, then Add.</div><?php endif; ?>
 
-<p class="admin-form-hint">Assign an app role and (optionally) a Checked By role to each person here — e.g. Rinaldi / Supervisor / Admin. <a href="manage_roles.php">Manage roles</a> if you need more than the defaults.</p>
+<p class="admin-form-hint">Add each person here — their Checked By entry (used on Washing/Sub Assembly/FO Pump Assy check sheets) is created and kept in sync automatically from their App Role, Checked By Role, and Sections below. <a href="manage_roles.php">Manage roles</a> if you need more than the defaults.</p>
 
 <form method="post" class="admin-form">
     <input type="hidden" name="action" value="save">
@@ -168,12 +163,12 @@ require __DIR__ . '/../includes/app_top.php';
     <div class="form-grid">
         <div class="form-row">
             <label>Name</label>
-            <input type="text" name="name" value="<?= htmlspecialchars($editRow['name'] ?? $prefillName) ?>" required>
+            <input type="text" name="name" value="<?= htmlspecialchars($editRow['name'] ?? '') ?>" required>
         </div>
         <div class="form-row">
             <label>Checked By Role (optional)</label>
             <select name="checker_role">
-                <?php $curCheckerRole = $editRow['checker_role'] ?? $prefillCheckerRole; ?>
+                <?php $curCheckerRole = $editRow['checker_role'] ?? ''; ?>
                 <option value="" <?= $curCheckerRole === '' ? 'selected' : '' ?>>- (none)</option>
                 <?php foreach ($checkerRoles as $cr): ?>
                     <option value="<?= htmlspecialchars($cr['name']) ?>" <?= $curCheckerRole === $cr['name'] ? 'selected' : '' ?>><?= htmlspecialchars($cr['label']) ?></option>
