@@ -24,8 +24,16 @@ $_SESSION['section_route'] = 'painting_list.php';
 require_once __DIR__ . '/includes/auth.php';
 require_section_access($pdo, (int) $department['id'], 'painting_list.php');
 
-$stmt = $pdo->prepare('SELECT * FROM m_checker WHERE department_id = ? AND is_active = 1 ORDER BY name');
-$stmt->execute([$department['id']]);
+// Checked By entries scoped strictly to this section — a person routed to
+// both Painting Checklist and Bake Oven Temperature has one m_checker row per
+// section, so scoping by section keeps the dropdown from listing them twice.
+$stmt = $pdo->prepare(
+    "SELECT c.* FROM m_checker c
+     WHERE c.department_id = ? AND c.is_active = 1
+       AND c.section_id = (SELECT id FROM m_checksheet_section WHERE department_id = ? AND route = 'painting_list.php')
+     ORDER BY c.name"
+);
+$stmt->execute([$department['id'], $department['id']]);
 $checkers = $stmt->fetchAll();
 
 $shifts = $pdo->query('SELECT * FROM m_shift WHERE is_active = 1 ORDER BY sort_order')->fetchAll();
@@ -66,7 +74,7 @@ require __DIR__ . '/includes/app_top.php';
     <div class="form-grid-top">
         <div class="field-block">
             <label>Date</label>
-            <input type="date" id="f_tanggal" value="<?= htmlspecialchars($draft['tanggal'] ?? date('Y-m-d')) ?>" readonly>
+            <input type="text" id="f_tanggal" class="holiday-date-input" readonly value="<?= htmlspecialchars($draft['tanggal'] ?? date('Y-m-d')) ?>" max="<?= date('Y-m-d') ?>">
         </div>
 
         <div class="field-block">
@@ -138,5 +146,6 @@ require __DIR__ . '/includes/app_top.php';
     const DRAFT_ID = <?= json_encode($draft_id ?: null) ?>;
     const DRAFT_VALUES = <?= json_encode($draft_values, JSON_FORCE_OBJECT) ?>;
 </script>
-<script src="assets/js/app.js"></script>
+<script src="assets/js/holiday-calendar.js?v=<?= @filemtime(__DIR__ . '/assets/js/holiday-calendar.js') ?: 1 ?>"></script>
+<script src="assets/js/app.js?v=<?= @filemtime(__DIR__ . '/assets/js/app.js') ?: 1 ?>"></script>
 <?php require __DIR__ . '/includes/app_bottom.php'; ?>

@@ -26,6 +26,18 @@
         }
     });
     backdrop.addEventListener('click', closeMobileSidebar);
+
+    // While the window is actively resized, suppress the sidebar slide
+    // transition so it doesn't lag across the mobile/desktop breakpoint and
+    // briefly cover the content. Also close the mobile overlay once we grow
+    // back to desktop width.
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        document.body.classList.add('is-resizing');
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => document.body.classList.remove('is-resizing'), 200);
+        if (!isMobile()) closeMobileSidebar();
+    });
 })();
 </script>
 </body>

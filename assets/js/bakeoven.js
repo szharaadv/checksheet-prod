@@ -14,8 +14,8 @@ document.querySelectorAll('.temp-input').forEach((el) => {
 document.getElementById('btn-submit').addEventListener('click', async () => {
     const rows = [];
     for (let day = 1; day <= DAYS_IN_MONTH; day++) {
-        const row = { day, checker_id: document.querySelector(`[data-day="${day}"][data-field="checker_id"]`)?.value || null };
-        let hasValue = !!row.checker_id;
+        const row = { day };
+        let hasValue = false;
         TIME_KEYS.forEach((key) => {
             const val = document.querySelector(`[data-day="${day}"][data-field="t_${key}"]`)?.value ?? '';
             row['t_' + key] = val;

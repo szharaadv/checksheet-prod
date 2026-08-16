@@ -48,9 +48,9 @@ function import_registry(): array
                            'FO Pump Production Model', 'FO Pump Production Quantity',
                            'To Assembly Line Model', 'To Assembly Line Quantity',
                            'To Sparepart PTC Model', 'To Sparepart PTC Quantity',
-                           'Total Production', 'Total Assembly', 'Total Export',
-                           'Convert Production', 'Convert Assembly', 'Convert Export',
-                           'Acumulation Production', 'Acumulation Assembly', 'Acumulation Export',
+                           'Total Production', 'Total Assembly', 'Total Sparepart PTC',
+                           'Convert Production', 'Convert Assembly', 'Convert Sparepart PTC',
+                           'Acumulation Production', 'Acumulation Assembly', 'Acumulation Sparepart PTC',
                            'Operator', 'Foreman', 'Supervisor'],
             'note'     => 'One row per production line (NO 1..' . FOPUMP_ROW_COUNT . '). Rows with the same Date form one report; Date/Employee/Shift/Convert/Acumulation/signatures repeat on each. Foreman/Supervisor must match an existing name in Checked By master data (Foreman/Supervisor role) — the form uses a dropdown, not free text. Total is auto-computed by the form and not saved, so it is left out of the fillable template. You can also upload the original F-FIP-03 .xlsx report(s) directly (one or many files, each with one or many month sheets) — no re-typing needed.',
             'fn'       => 'import_fopump',
@@ -67,28 +67,40 @@ function import_registry(): array
                              'To Assembly Line Model', 'To Assembly Line Quantity',
                              'To Sparepart PTC Model', 'To Sparepart PTC Quantity']],
                 ['label' => 'Convert & Acumulation — fill once per Date (repeat on every row)',
-                 'cols'  => ['Convert Production', 'Convert Assembly', 'Convert Export',
-                             'Acumulation Production', 'Acumulation Assembly', 'Acumulation Export']],
+                 'cols'  => ['Convert Production', 'Convert Assembly', 'Convert Sparepart PTC',
+                             'Acumulation Production', 'Acumulation Assembly', 'Acumulation Sparepart PTC']],
                 ['label' => 'Signatures — fill once per Date (repeat on every row)',
                  'cols'  => ['Operator', 'Foreman', 'Supervisor']],
                 ['label' => 'Auto-computed by the form — leave blank, only shown when exporting',
-                 'cols'  => ['Total Production', 'Total Assembly', 'Total Export'],
+                 'cols'  => ['Total Production', 'Total Assembly', 'Total Sparepart PTC'],
                  'readonly' => true],
             ],
         ],
         'assembly_list.php' => [
             'label'    => 'Torque (Daily Torque)',
-            'template' => ['tanggal', 'model', 'checker', 'mark_crank_shaft', 'mark_conrod', 'mark_fo_pump',
-                           'no_cyl_block', 'no_engine', 'detail_model', 'checking_item', 'actual_result', 'consumable_item'],
-            'note'     => 'One row per checking item. Rows with the same tanggal + model form one sheet; header fields repeat. checking_item must match the Checking Item master for that model.',
+            // Columns match the real historical PowerApps export layout exactly
+            // (including the "CosumbleItem" spelling), so past months' .xlsx
+            // reports can be uploaded as-is — no reformatting needed. Standard/
+            // StandardMin./StandardMax. are reference columns from the Checking
+            // Item master data, included to match the original layout but
+            // ignored on import.
+            'template' => ['Checking Item', 'DetailModel', 'Date', 'Standard', 'StandardMin.', 'StandardMax.',
+                           'ActualResult', 'CosumbleItem', 'NoCylBlock', 'NoEngine', 'Model',
+                           'MarkConrod', 'MarkCrankShaft', 'MarkFOPump', 'Checker'],
+            'note'     => 'One row per checking item. Rows with the same Date + Model form one sheet; header fields repeat. Checking Item / Model must match master data. Standard/StandardMin./StandardMax. come from master data and are ignored on import even though included in the template.',
             'fn'       => 'import_torque',
             'export'   => 'export_torque',
+            'xlsx_extract' => 'torque_extract_from_xlsx',
+            'template_include_readonly' => true,
             'groups'   => [
-                ['label' => 'Header — repeat on every row of the same tanggal + model',
-                 'cols'  => ['tanggal', 'model', 'checker', 'mark_crank_shaft', 'mark_conrod', 'mark_fo_pump',
-                             'no_cyl_block', 'no_engine', 'detail_model']],
+                ['label' => 'Header — repeat on every row of the same Date + Model',
+                 'cols'  => ['DetailModel', 'Date', 'NoCylBlock', 'NoEngine', 'Model',
+                             'MarkConrod', 'MarkCrankShaft', 'MarkFOPump', 'Checker']],
                 ['label' => 'Checklist detail — one row per checking item',
-                 'cols'  => ['checking_item', 'actual_result', 'consumable_item']],
+                 'cols'  => ['Checking Item', 'ActualResult', 'CosumbleItem']],
+                ['label' => 'Reference from master data — included in the template layout, ignored on import',
+                 'cols'  => ['Standard', 'StandardMin.', 'StandardMax.'],
+                 'readonly' => true],
             ],
         ],
         'painting_list.php' => [
@@ -234,10 +246,10 @@ function fopump_aliases(): array
         'supervisor'     => ['supervisor'],
         'convert_prod'   => ['convert production', 'convert_prod'],
         'convert_assy'   => ['convert assembly', 'convert_assy'],
-        'convert_export' => ['convert export', 'convert_export'],
+        'convert_export' => ['convert sparepart ptc', 'convert sparepart', 'convert export', 'convert_export'],
         'accum_prod'     => ['acumulation production', 'accumulation production', 'accum_prod'],
         'accum_assy'     => ['acumulation assembly', 'accumulation assembly', 'accum_assy'],
-        'accum_export'   => ['acumulation export', 'accumulation export', 'accum_export'],
+        'accum_export'   => ['acumulation sparepart ptc', 'accumulation sparepart ptc', 'acumulation export', 'accumulation export', 'accum_export'],
     ];
 }
 
@@ -552,9 +564,100 @@ function fopump_build_template_xlsx(?int $year = null, ?int $month = null): stri
 // Type C: Torque & Painting — header + dynamic checklist detail
 // ---------------------------------------------------------------------------
 
+/**
+ * Read a real historical Torque .xlsx export directly (flat table: row 1
+ * headers, one row per checking item) — no need to save-as-CSV first. Row
+ * order/column order don't matter; header aliasing happens in
+ * import_torque() same as CSV. Only the Date column needs special handling
+ * since Excel stores it as a numeric day-serial, not text.
+ */
+function torque_extract_from_xlsx(string $path): array
+{
+    $sheets = xlsx_read_workbook($path);
+    if (!$sheets) {
+        return [];
+    }
+    $cells = $sheets[0]['cells'];
+    if (!$cells) {
+        return [];
+    }
+
+    $rowNums = array_keys($cells);
+    sort($rowNums, SORT_NUMERIC);
+    $headerRowNum = array_shift($rowNums);
+    $headers = []; // colLetter => lowercase header
+    foreach ($cells[$headerRowNum] as $col => $val) {
+        $headers[$col] = strtolower(trim((string) $val));
+    }
+
+    $rows = [];
+    foreach ($rowNums as $rowNum) {
+        $raw = $cells[$rowNum];
+        if (!$raw) {
+            continue;
+        }
+        $row = [];
+        foreach ($headers as $col => $header) {
+            if ($header === '') {
+                continue;
+            }
+            $val = trim((string) ($raw[$col] ?? ''));
+            if ($header === 'date' && $val !== '' && preg_match('/^\d+(\.\d+)?$/', $val)) {
+                $val = xlsx_serial_to_date((float) $val);
+            }
+            $row[$header] = $val;
+        }
+        if (array_filter($row, fn($v) => $v !== '')) {
+            $rows[] = $row;
+        }
+    }
+    return $rows;
+}
+
+/** Field-alias map for Torque (supports the real PowerApps export layout, e.g. "MarkCrankShaft", "CosumbleItem"). */
+function torque_aliases(): array
+{
+    return [
+        'tanggal'          => ['date', 'tanggal'],
+        'model'            => ['model'],
+        'checker'          => ['checker', 'checked by', 'checked by :'],
+        'mark_crank_shaft' => ['markcrankshaft', 'mark crank shaft', 'mark_crank_shaft'],
+        'mark_conrod'      => ['markconrod', 'mark conrod', 'mark_conrod'],
+        'mark_fo_pump'     => ['markfopump', 'mark fo pump', 'mark_fo_pump'],
+        'no_cyl_block'     => ['nocylblock', 'no cyl block', 'no_cyl_block'],
+        'no_engine'        => ['noengine', 'no engine', 'no_engine'],
+        'detail_model'     => ['detailmodel', 'detail model', 'detail_model'],
+        'checking_item'    => ['checking item', 'checking_item'],
+        'actual_result'    => ['actualresult', 'actual result', 'actual_result'],
+        // "CosumbleItem" is the real spelling used in the historical PowerApps
+        // export — kept as the primary alias alongside the correctly spelled ones.
+        'consumable_item'  => ['cosumbleitem', 'cosumble item', 'consumableitem', 'consumable item', 'consumable_item'],
+    ];
+}
+
 function import_torque(PDO $pdo, int $dept, array $rows): array
 {
     $res = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
+    $A = torque_aliases();
+    // Normalise each row into internal keys so grouping/lookup is uniform
+    // regardless of which header layout (plain or PowerApps-style) was used.
+    foreach ($rows as &$r) {
+        $r = [
+            'tanggal'          => import_val($r, $A['tanggal']),
+            'model'            => import_val($r, $A['model']),
+            'checker'          => import_val($r, $A['checker']),
+            'mark_crank_shaft' => import_val($r, $A['mark_crank_shaft']),
+            'mark_conrod'      => import_val($r, $A['mark_conrod']),
+            'mark_fo_pump'     => import_val($r, $A['mark_fo_pump']),
+            'no_cyl_block'     => import_val($r, $A['no_cyl_block']),
+            'no_engine'        => import_val($r, $A['no_engine']),
+            'detail_model'     => import_val($r, $A['detail_model']),
+            'checking_item'    => import_val($r, $A['checking_item']),
+            'actual_result'    => import_val($r, $A['actual_result']),
+            'consumable_item'  => import_val($r, $A['consumable_item']),
+        ];
+    }
+    unset($r);
     $groups = import_group($rows, ['tanggal', 'model']);
 
     $selH = $pdo->prepare('SELECT id FROM t_assy_header WHERE department_id=? AND tanggal=? AND model_id=?');
@@ -802,9 +905,9 @@ function export_fopump(PDO $pdo, int $dept): array
         }
         $base = [
             'Employee' => $h['employee'], 'Working Time' => $h['working_time'], 'Shift' => $h['shift'],
-            'Total Production' => $fmt($tp), 'Total Assembly' => $fmt($ta), 'Total Export' => $fmt($te),
-            'Convert Production' => $h['convert_prod'], 'Convert Assembly' => $h['convert_assy'], 'Convert Export' => $h['convert_export'],
-            'Acumulation Production' => $h['accum_prod'], 'Acumulation Assembly' => $h['accum_assy'], 'Acumulation Export' => $h['accum_export'],
+            'Total Production' => $fmt($tp), 'Total Assembly' => $fmt($ta), 'Total Sparepart PTC' => $fmt($te),
+            'Convert Production' => $h['convert_prod'], 'Convert Assembly' => $h['convert_assy'], 'Convert Sparepart PTC' => $h['convert_export'],
+            'Acumulation Production' => $h['accum_prod'], 'Acumulation Assembly' => $h['accum_assy'], 'Acumulation Sparepart PTC' => $h['accum_export'],
             'Operator' => $h['operator_name'], 'Foreman' => $h['foreman_name'], 'Supervisor' => $h['supervisor_name'],
         ];
         if (!$details) $details = [['row_no' => '', 'prod_model' => '', 'prod_qty' => '', 'assy_model' => '', 'assy_qty' => '', 'export_model' => '', 'export_qty' => '']];
@@ -824,7 +927,7 @@ function export_torque(PDO $pdo, int $dept): array
 {
     $stmt = $pdo->prepare(
         'SELECT h.*, m.name AS model_name, ck.name AS checker_name,
-                d.actual_result, d.consumable_item, ci.checking_item, ci.sort_order AS so
+                d.actual_result, d.consumable_item, ci.checking_item, ci.standard, ci.standard_min, ci.standard_max, ci.sort_order AS so
          FROM t_assy_header h
          JOIN t_assy_detail d ON d.header_id = h.id
          JOIN m_assy_checklist_item ci ON ci.id = d.checklist_item_id
@@ -836,10 +939,12 @@ function export_torque(PDO $pdo, int $dept): array
     $out = [];
     foreach ($stmt->fetchAll() as $r) {
         $out[] = [
-            'tanggal' => $r['tanggal'], 'model' => $r['model_name'], 'checker' => $r['checker_name'],
-            'mark_crank_shaft' => $r['mark_crank_shaft'], 'mark_conrod' => $r['mark_conrod'], 'mark_fo_pump' => $r['mark_fo_pump'],
-            'no_cyl_block' => $r['no_cyl_block'], 'no_engine' => $r['no_engine'], 'detail_model' => $r['detail_model'],
-            'checking_item' => $r['checking_item'], 'actual_result' => $r['actual_result'], 'consumable_item' => $r['consumable_item'],
+            'Checking Item' => $r['checking_item'], 'DetailModel' => $r['detail_model'], 'Date' => $r['tanggal'],
+            'Standard' => $r['standard'], 'StandardMin.' => $r['standard_min'], 'StandardMax.' => $r['standard_max'],
+            'ActualResult' => $r['actual_result'], 'CosumbleItem' => $r['consumable_item'],
+            'NoCylBlock' => $r['no_cyl_block'], 'NoEngine' => $r['no_engine'], 'Model' => $r['model_name'],
+            'MarkConrod' => $r['mark_conrod'], 'MarkCrankShaft' => $r['mark_crank_shaft'], 'MarkFOPump' => $r['mark_fo_pump'],
+            'Checker' => $r['checker_name'],
         ];
     }
     return $out;

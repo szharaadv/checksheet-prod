@@ -159,5 +159,5 @@ require __DIR__ . '/includes/app_top.php';
     const YEAR = <?= json_encode($year) ?>;
     const DAYS_IN_MONTH = <?= json_encode($daysInMonth) ?>;
 </script>
-<script src="assets/js/washing.js"></script>
+<script src="assets/js/washing.js?v=<?= @filemtime(__DIR__ . '/assets/js/washing.js') ?: 1 ?>"></script>
 <?php require __DIR__ . '/includes/app_bottom.php'; ?>

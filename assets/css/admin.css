@@ -131,7 +131,7 @@
 .filter-form { flex-wrap: wrap; }
 
 .admin-table th {
-    background: #b8382a;
+    background: #9b3b32;
     color: #fff;
     padding: 10px 8px;
     text-align: center;
@@ -152,7 +152,7 @@
 
 .row-actions a {
     margin-right: 10px;
-    color: #b8382a;
+    color: #9b3b32;
     text-decoration: none;
     font-weight: 600;
 }
@@ -240,7 +240,7 @@
 .perm-matrix input[type="checkbox"] {
     width: 18px;
     height: 18px;
-    accent-color: #b8382a;
+    accent-color: #9b3b32;
     cursor: pointer;
 }
 .perm-matrix input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .55; }
@@ -295,7 +295,7 @@
     background: #fff;
 }
 
-.section-picker select:focus { outline: none; border-color: #b8382a; }
+.section-picker select:focus { outline: none; border-color: #9b3b32; }
 
 .import-steps { display: flex; flex-direction: column; gap: 16px; }
 
@@ -317,7 +317,7 @@
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: #b8382a;
+    background: #9b3b32;
     color: #fff;
     font-size: 11.5px;
     font-weight: 700;
@@ -353,7 +353,7 @@
     background: #fff;
 }
 
-.import-month-select:focus { outline: none; border-color: #b8382a; }
+.import-month-select:focus { outline: none; border-color: #9b3b32; }
 
 .import-alt {
     font-size: 12.5px;
@@ -362,7 +362,7 @@
     line-height: 1.5;
 }
 
-.import-alt a { color: #b8382a; font-weight: 600; text-decoration: none; }
+.import-alt a { color: #9b3b32; font-weight: 600; text-decoration: none; }
 .import-alt a:hover { text-decoration: underline; }
 
 .import-columns { margin-top: 18px; }
@@ -487,3 +487,10 @@
     white-space: nowrap;
 }
 .btn-secondary:hover { background: #f5f6f8; }
+
+/* ---------- Classic light table header (minimalist restyle) ---------- */
+.admin-table th {
+    background: #f1f2f4;
+    color: #1f2430;
+    border-bottom: 2px solid #d7dbe2;
+}

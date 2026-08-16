@@ -106,7 +106,9 @@ require __DIR__ . '/includes/app_top.php';
         <table id="bakeoven-table" class="bakeoven-table">
             <thead>
                 <tr>
-                    <th>Waktu Pengecekan</th>
+                    <th class="bo-corner-cell">
+                        <span class="bo-corner-text">Waktu<br>Pengecekan</span>
+                    </th>
                     <?php for ($day = 1; $day <= $daysInMonth; $day++): ?>
                         <th><?= $day ?></th>
                     <?php endfor; ?>
@@ -132,23 +134,6 @@ require __DIR__ . '/includes/app_top.php';
                     <?php endfor; ?>
                 </tr>
                 <?php endforeach; ?>
-                <tr class="paraf-row">
-                    <td class="row-label">Paraf</td>
-                    <?php for ($day = 1; $day <= $daysInMonth; $day++):
-                        $e = $entries[$day] ?? null;
-                        $rowDate = sprintf('%04d-%02d-%02d', $year, $month, $day);
-                        $dis = $rowDate > $today ? 'disabled' : '';
-                    ?>
-                        <td>
-                            <select class="w-select" data-day="<?= $day ?>" data-field="checker_id" <?= $dis ?>>
-                                <option value="">-</option>
-                                <?php foreach ($allCheckers as $c): ?>
-                                    <option value="<?= $c['id'] ?>" <?= ($e['checker_id'] ?? null) == $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </td>
-                    <?php endfor; ?>
-                </tr>
             </tbody>
         </table>
     </div>
@@ -201,5 +186,5 @@ require __DIR__ . '/includes/app_top.php';
     const TEMP_MIN = <?= json_encode(BAKEOVEN_TEMP_MIN) ?>;
     const TEMP_MAX = <?= json_encode(BAKEOVEN_TEMP_MAX) ?>;
 </script>
-<script src="assets/js/bakeoven.js"></script>
+<script src="assets/js/bakeoven.js?v=<?= @filemtime(__DIR__ . '/assets/js/bakeoven.js') ?: 1 ?>"></script>
 <?php require __DIR__ . '/includes/app_bottom.php'; ?>

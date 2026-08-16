@@ -53,7 +53,25 @@ $page_subtitle = $page_subtitle ?? '';
                     <?php elseif ($page_subtitle): ?><p><?= htmlspecialchars($page_subtitle) ?></p><?php endif; ?>
                 </div>
             </div>
-            <div class="topbar-date"><?= date('D, d M Y') ?></div>
+            <div class="topbar-right">
+                <div class="topbar-date"><?= date('D, d M Y') ?></div>
+                <?php if (!empty($me)): ?>
+                <div class="topbar-user">
+                    <div class="tu-avatar">
+                        <?php if (!empty($me['avatar'])): ?>
+                            <img src="<?= htmlspecialchars($me['avatar']) ?>" alt="">
+                        <?php else: ?>
+                            <span><?= htmlspecialchars(user_initials($me['name'])) ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="tu-meta">
+                        <div class="tu-name" title="<?= htmlspecialchars($me['name']) ?>"><?= htmlspecialchars($me['name']) ?></div>
+                        <div class="tu-role"><?= htmlspecialchars($me['role']) ?></div>
+                    </div>
+                    <a class="tu-logout" href="<?= $base_url ?>logout.php">Logout</a>
+                </div>
+                <?php endif; ?>
+            </div>
         </div>
 
-        <div class="app-content">
+        <div class="app-content<?= ($active_nav ?? '') !== 'checksheet' ? ' app-content-doc' : '' ?>">

@@ -97,7 +97,7 @@ body {
 .dept-grid .dept-card:nth-child(4) { animation-delay: .48s; }
 
 .dept-card:hover {
-    border-color: #b8382a;
+    border-color: #9b3b32;
     box-shadow: 0 4px 14px rgba(184,56,42,.12);
     transform: translateY(-3px);
 }
@@ -114,7 +114,7 @@ body {
     height: 56px;
     margin: 0 auto 14px;
     border-radius: 12px;
-    background: #b8382a;
+    background: #9b3b32;
     color: #fff;
     display: flex;
     align-items: center;
@@ -123,8 +123,8 @@ body {
 }
 
 .dept-name { font: 600 16px Inter, sans-serif; margin-bottom: 8px; color: #181a1e; }
-.dept-go { font-size: 12.5px; font-weight: 600; color: #b8382a; }
+.dept-go { font-size: 12.5px; font-weight: 600; color: #9b3b32; }
 
-.dept-switch-link { color: #b8382a !important; }
+.dept-switch-link { color: #9b3b32 !important; }
 
 .empty { color: #8b93a1; grid-column: 1 / -1; }

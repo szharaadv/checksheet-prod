@@ -117,7 +117,28 @@ if (($_GET['action'] ?? '') === 'resync_all') {
         $sids = array_map('intval', explode(',', $u['section_ids']));
         sync_checker_entries($pdo, $u['name'], $u['checker_role'], $sids, $sectionsById);
     }
-    header('Location: users.php?resynced=1');
+
+    // Auto-prune: deactivate any Checked By row that no longer matches a
+    // current User's section routing (same definition as the "Other Checked
+    // By Entries" list below). Deactivated, not deleted, so past check sheets
+    // keep showing the name; reactivate from the panel if ever needed.
+    $pruned = $pdo->exec(
+        "UPDATE m_checker c
+         LEFT JOIN m_user u ON u.name = c.name
+         LEFT JOIN m_user_section us ON us.user_id = u.id AND us.section_id = c.section_id
+         SET c.is_active = 0
+         WHERE c.is_active = 1
+           AND (
+                u.id IS NULL
+             OR (c.section_id IS NOT NULL AND us.section_id IS NULL)
+             OR (c.section_id IS NULL AND EXISTS (
+                   SELECT 1 FROM m_user_section us2
+                   JOIN m_user u2 ON u2.id = us2.user_id
+                   WHERE u2.name = c.name))
+           )"
+    );
+
+    header('Location: users.php?resynced=1&pruned=' . (int) $pruned);
     exit;
 }
 
@@ -134,7 +155,12 @@ if (($_GET['action'] ?? '') === 'edit' && isset($_GET['id'])) {
     }
 }
 
-$rows = $pdo->query('SELECT * FROM m_user ORDER BY name')->fetchAll();
+// Order by App Role rank (Super Admin -> Admin -> User -> ...), then name.
+$rows = $pdo->query(
+    'SELECT u.* FROM m_user u
+     LEFT JOIN m_role r ON r.name = u.role
+     ORDER BY COALESCE(r.sort_order, 999), u.name'
+)->fetchAll();
 
 $allRoles = get_all_roles($pdo);
 $roleLabels = array_column($allRoles, 'label', 'name');
@@ -164,13 +190,16 @@ $orphanCheckers = $pdo->query(
      LEFT JOIN m_checksheet_section s ON s.id = c.section_id
      LEFT JOIN m_user u ON u.name = c.name
      LEFT JOIN m_user_section us ON us.user_id = u.id AND us.section_id = c.section_id
-     WHERE u.id IS NULL
-        OR (c.section_id IS NOT NULL AND us.section_id IS NULL)
-        OR (c.section_id IS NULL AND EXISTS (
-              SELECT 1 FROM m_user_section us2
-              JOIN m_user u2 ON u2.id = us2.user_id
-              WHERE u2.name = c.name
-            ))
+     WHERE c.is_active = 1
+       AND (
+            u.id IS NULL
+         OR (c.section_id IS NOT NULL AND us.section_id IS NULL)
+         OR (c.section_id IS NULL AND EXISTS (
+               SELECT 1 FROM m_user_section us2
+               JOIN m_user u2 ON u2.id = us2.user_id
+               WHERE u2.name = c.name
+             ))
+       )
      ORDER BY d.sort_order, c.name"
 )->fetchAll();
 
@@ -188,7 +217,7 @@ require __DIR__ . '/../includes/app_top.php';
 <?php if ($error): ?><div class="alert alert-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 <?php if (isset($_GET['saved'])): ?><div class="alert alert-ok">Data saved.</div><?php endif; ?>
 <?php if (isset($_GET['deleted'])): ?><div class="alert alert-ok">Data deleted.</div><?php endif; ?>
-<?php if (isset($_GET['resynced'])): ?><div class="alert alert-ok">Checked By entries resynced for everyone below.</div><?php endif; ?>
+<?php if (isset($_GET['resynced'])): ?><div class="alert alert-ok">Checked By entries resynced for everyone below.<?php if (!empty($_GET['pruned'])): ?> <?= (int) $_GET['pruned'] ?> stray <?= (int) $_GET['pruned'] === 1 ? 'entry' : 'entries' ?> deactivated.<?php endif; ?></div><?php endif; ?>
 <?php if ($prefillName): ?><div class="alert alert-ok">Turning "<?= htmlspecialchars($prefillName) ?>" into a proper User — pick their App Role and sections below, then Add.</div><?php endif; ?>
 
 <p class="admin-form-hint">Add each person here — their Checked By entry (used on Washing/Sub Assembly/FO Pump Assy check sheets) is created and kept in sync automatically from their App Role, Checked By Role, and Sections below, so check sheet dropdowns show exactly who's routed there. <a href="manage_roles.php">Manage roles</a> if you need more than the defaults. <a href="users.php?action=resync_all">Resync everyone now</a> if something looks out of sync.</p>

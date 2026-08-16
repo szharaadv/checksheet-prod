@@ -26,7 +26,9 @@ function sync_checker_entries(PDO $pdo, string $name, ?string $checkerRole, arra
         $checkerId = $stmt->fetchColumn();
 
         if ($checkerId) {
-            $pdo->prepare('UPDATE m_checker SET role = ? WHERE id = ?')->execute([$checkerRole, $checkerId]);
+            // Reactivate too: this section may have been deactivated earlier
+            // (e.g. auto-pruned) before being reassigned — keep it in step.
+            $pdo->prepare('UPDATE m_checker SET role = ?, is_active = 1 WHERE id = ?')->execute([$checkerRole, $checkerId]);
             continue;
         }
 
@@ -35,7 +37,7 @@ function sync_checker_entries(PDO $pdo, string $name, ?string $checkerRole, arra
         $unassignedId = $stmt->fetchColumn();
 
         if ($unassignedId) {
-            $pdo->prepare('UPDATE m_checker SET section_id = ?, role = ? WHERE id = ?')->execute([$sid, $checkerRole, $unassignedId]);
+            $pdo->prepare('UPDATE m_checker SET section_id = ?, role = ?, is_active = 1 WHERE id = ?')->execute([$sid, $checkerRole, $unassignedId]);
         } else {
             $pdo->prepare('INSERT INTO m_checker (department_id, section_id, name, role) VALUES (?, ?, ?, ?)')->execute([$deptId, $sid, $name, $checkerRole]);
         }

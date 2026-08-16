@@ -30,11 +30,7 @@ const BAKEOVEN_VIEW_TEMP_MAX = 165;
 $monthStart = sprintf('%04d-%02d-01', $year, $month);
 $monthEnd = sprintf('%04d-%02d-%02d', $year, $month, $daysInMonth);
 
-$stmt = $pdo->prepare(
-    "SELECT e.*, ck.name AS checker_name FROM t_bakeoven_entry e
-     LEFT JOIN m_checker ck ON ck.id = e.checker_id
-     WHERE e.department_id = ? AND e.tanggal BETWEEN ? AND ?"
-);
+$stmt = $pdo->prepare('SELECT * FROM t_bakeoven_entry WHERE department_id = ? AND tanggal BETWEEN ? AND ?');
 $stmt->execute([$selected_department_id, $monthStart, $monthEnd]);
 $entries = [];
 foreach ($stmt->fetchAll() as $e) {
@@ -95,7 +91,9 @@ require __DIR__ . '/includes/app_top.php';
         <table class="bakeoven-table">
             <thead>
                 <tr>
-                    <th>Waktu Pengecekan</th>
+                    <th class="bo-corner-cell">
+                        <span class="bo-corner-text">Waktu<br>Pengecekan</span>
+                    </th>
                     <?php for ($day = 1; $day <= $daysInMonth; $day++): ?>
                         <th><?= $day ?></th>
                     <?php endfor; ?>
@@ -117,14 +115,6 @@ require __DIR__ . '/includes/app_top.php';
                     <?php endfor; ?>
                 </tr>
                 <?php endforeach; ?>
-                <tr class="paraf-row">
-                    <td class="row-label">Paraf</td>
-                    <?php for ($day = 1; $day <= $daysInMonth; $day++):
-                        $e = $entries[$day] ?? null;
-                    ?>
-                        <td><?= !empty($e['checker_name']) ? htmlspecialchars($e['checker_name']) : '-' ?></td>
-                    <?php endfor; ?>
-                </tr>
             </tbody>
         </table>
     </div>

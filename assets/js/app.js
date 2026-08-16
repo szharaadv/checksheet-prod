@@ -96,11 +96,67 @@ tbody.addEventListener('click', (e) => {
     btn.classList.add('active');
 });
 
+// ---- Auto OK/NG from Standard vs Actual Result ----
+function toNum(v) {
+    if (v === null || v === undefined) return null;
+    const n = parseFloat(String(v).trim().replace(',', '.'));
+    return isNaN(n) ? null : n;
+}
+
+/** Returns 'OK' | 'NG' | null (null = no standard / empty actual → leave manual). */
+function autoVerdict(item, actualRaw) {
+    const actual = (actualRaw ?? '').toString().trim();
+    if (actual === '') return null;
+
+    const minRaw = (item.standard_min ?? '').toString().trim();
+    const maxRaw = (item.standard_max ?? '').toString().trim();
+    const hasMin = minRaw !== '' && minRaw !== '-';
+    const hasMax = maxRaw !== '' && maxRaw !== '-';
+    if (!hasMin && !hasMax) return null; // no standard → don't auto-decide
+
+    const min = toNum(minRaw), max = toNum(maxRaw), val = toNum(actual);
+
+    // Numeric range check.
+    if (val !== null && (min !== null || max !== null)) {
+        if (min !== null && val < min) return 'NG';
+        if (max !== null && val > max) return 'NG';
+        return 'OK';
+    }
+
+    // Non-numeric expected value (e.g. "Tidak Bocor"): must match exactly.
+    const expected = hasMin ? minRaw : maxRaw;
+    return actual.toLowerCase() === expected.toLowerCase() ? 'OK' : 'NG';
+}
+
+/** Apply the auto verdict to an item's OK/NG toggle + actual-field styling. */
+function applyAutoCategory(itemId) {
+    const item = currentItems.find(i => String(i.id) === String(itemId));
+    if (!item) return;
+    const actualEl = document.querySelector(`[data-item-id="${itemId}"][data-field="actual"]`);
+    const verdict = autoVerdict(item, actualEl ? actualEl.value : '');
+
+    if (actualEl) {
+        actualEl.classList.toggle('val-ng', verdict === 'NG');
+        actualEl.classList.toggle('val-ok', verdict === 'OK');
+    }
+
+    const toggle = document.querySelector(`.cat-toggle[data-item-id="${itemId}"]`);
+    const hidden = document.querySelector(`.category-value[data-item-id="${itemId}"]`);
+    if (!toggle || !hidden) return; // only auto-fill OK/NG toggles
+
+    const okBtn = toggle.querySelector('.cat-ok');
+    const ngBtn = toggle.querySelector('.cat-btn.cat-ng');
+    toggle.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    if (verdict === 'OK' && okBtn) { hidden.value = okBtn.dataset.value; okBtn.classList.add('active'); }
+    else if (verdict === 'NG' && ngBtn) { hidden.value = ngBtn.dataset.value; ngBtn.classList.add('active'); }
+    else { hidden.value = ''; }
+}
+
 tbody.addEventListener('input', (e) => {
-    if (e.target.matches('.actual-input')) updateProgress();
+    if (e.target.matches('.actual-input')) { applyAutoCategory(e.target.dataset.itemId); updateProgress(); }
 });
 tbody.addEventListener('change', (e) => {
-    if (e.target.matches('.actual-select')) updateProgress();
+    if (e.target.matches('.actual-select')) { applyAutoCategory(e.target.dataset.itemId); updateProgress(); }
 });
 
 async function loadItems() {

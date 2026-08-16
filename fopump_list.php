@@ -50,6 +50,15 @@ $stmt = $pdo->prepare(
 $stmt->execute([$department['id'], $department['id']]);
 $supervisors = $stmt->fetchAll();
 
+$stmt = $pdo->prepare(
+    "SELECT c.* FROM m_checker c
+     WHERE c.department_id = ? AND c.is_active = 1 AND c.role = 'operator'
+       AND c.section_id = (SELECT id FROM m_checksheet_section WHERE department_id = ? AND route = 'fopump_list.php')
+     ORDER BY c.name"
+);
+$stmt->execute([$department['id'], $department['id']]);
+$operators = $stmt->fetchAll();
+
 // Selected date (backdate allowed, no future).
 $today = date('Y-m-d');
 $tanggal = $_GET['date'] ?? $today;
@@ -87,7 +96,8 @@ require __DIR__ . '/includes/app_top.php';
     <div class="form-grid-top">
         <div class="field-block">
             <label>Date</label>
-            <input type="date" id="f_tanggal" value="<?= htmlspecialchars($tanggal) ?>" max="<?= $today ?>"
+            <input type="text" id="f_tanggal" class="holiday-date-input" readonly
+                   value="<?= htmlspecialchars($tanggal) ?>" max="<?= $today ?>"
                    onchange="window.location.href='fopump_list.php?date=' + this.value">
         </div>
         <div class="field-block">
@@ -158,7 +168,18 @@ require __DIR__ . '/includes/app_top.php';
     <div class="form-grid-top" style="margin-top:16px;">
         <div class="field-block">
             <label>Operator</label>
-            <input type="text" id="f_operator" value="<?= htmlspecialchars($header['operator_name'] ?? '') ?>">
+            <select id="f_operator">
+                <option value="">-</option>
+                <?php
+                $opNames = array_column($operators, 'name');
+                $savedOp = $header['operator_name'] ?? '';
+                if ($savedOp !== '' && !in_array($savedOp, $opNames, true)): ?>
+                    <option value="<?= htmlspecialchars($savedOp) ?>" selected><?= htmlspecialchars($savedOp) ?></option>
+                <?php endif; ?>
+                <?php foreach ($operators as $c): ?>
+                    <option value="<?= htmlspecialchars($c['name']) ?>" <?= $savedOp === $c['name'] ? 'selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
         </div>
         <div class="field-block">
             <label>Foreman</label>
@@ -191,4 +212,5 @@ require __DIR__ . '/includes/app_top.php';
     const ROW_COUNT = <?= json_encode($rowCount) ?>;
 </script>
 <script src="assets/js/fopump.js?v=<?= @filemtime(__DIR__ . '/assets/js/fopump.js') ?: 1 ?>"></script>
+<script src="assets/js/holiday-calendar.js"></script>
 <?php require __DIR__ . '/includes/app_bottom.php'; ?>

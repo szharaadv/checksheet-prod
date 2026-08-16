@@ -1,0 +1,54 @@
+<?php
+require_once __DIR__ . '/config/db.php';
+$pdo = get_db();
+
+if (($_GET['action'] ?? '') === 'delete' && isset($_GET['id'])) {
+    $stmt = $pdo->prepare("DELETE FROM t_fpcs_header WHERE id = ? AND status = 'draft'");
+    $stmt->execute([(int)$_GET['id']]);
+    header('Location: my_fpcheck_drafts.php?deleted=1');
+    exit;
+}
+
+$sql = "SELECT h.*, v.name AS variant_name, s.department_id
+        FROM t_fpcs_header h
+        JOIN m_checksheet_section s ON s.id = h.section_id
+        LEFT JOIN m_fpcs_variant v ON v.id = h.variant_id
+        WHERE h.status = 'draft' AND s.route = 'fpcheck_list.php'
+        ORDER BY h.updated_at DESC";
+$drafts = $pdo->query($sql)->fetchAll();
+
+$base_url = '';
+$active_nav = 'my-drafts';
+$page_title = 'My Drafts';
+$page_subtitle = 'FO Pump Assy Check Sheets not yet submitted';
+require __DIR__ . '/includes/app_top.php';
+?>
+
+<?php if (isset($_GET['deleted'])): ?><div class="alert alert-ok">Draft deleted.</div><?php endif; ?>
+
+<div class="cs-card-list">
+    <?php foreach ($drafts as $row): ?>
+    <div class="cs-card">
+        <div class="cs-card-date">
+            <div class="cs-card-day"><?= htmlspecialchars(date('d', strtotime($row['tanggal']))) ?></div>
+            <div class="cs-card-month"><?= htmlspecialchars(date('M', strtotime($row['tanggal']))) ?></div>
+        </div>
+        <div class="cs-card-body">
+            <div class="cs-card-title">
+                <?= htmlspecialchars($row['variant_name'] ?: 'Check Sheet') ?><?php if ($row['model']): ?> &middot; <?= htmlspecialchars($row['model']) ?><?php endif; ?>
+            </div>
+            <div class="cs-card-meta">
+                Checker <?= htmlspecialchars($row['checker'] ?: '-') ?> &middot; last saved <?= htmlspecialchars(date('d/m/Y H:i', strtotime($row['updated_at']))) ?>
+            </div>
+        </div>
+        <span class="cs-status cs-status-draft">Draft</span>
+        <div class="cs-card-actions">
+            <a href="fpcheck_list.php?department_id=<?= $row['department_id'] ?>&draft_id=<?= $row['id'] ?>" class="cs-view-btn">Continue</a>
+            <a href="my_fpcheck_drafts.php?action=delete&id=<?= $row['id'] ?>" onclick="return confirm('Delete this draft?')" class="cs-delete-link">Delete</a>
+        </div>
+    </div>
+    <?php endforeach; ?>
+    <?php if (!$drafts): ?><div class="empty-state">No drafts yet.</div><?php endif; ?>
+</div>
+
+<?php require __DIR__ . '/includes/app_bottom.php'; ?>

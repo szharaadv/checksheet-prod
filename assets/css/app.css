@@ -44,7 +44,8 @@ body {
 .sidebar {
     width: 250px;
     flex-shrink: 0;
-    background: #181a1e;
+    background: #ffffff;
+    border-right: 1px solid #e3e5e9;
     display: flex;
     flex-direction: column;
     padding: 20px 0;
@@ -64,7 +65,7 @@ body {
     align-items: center;
     gap: 10px;
     padding: 0 18px 18px;
-    border-bottom: 1px solid rgba(255,255,255,.08);
+    border-bottom: 1px solid #e9ebee;
     margin-bottom: 10px;
     flex-shrink: 0;
 }
@@ -72,8 +73,8 @@ body {
 .brand-mark {
     width: 36px;
     height: 36px;
-    border-radius: 8px;
-    background: #b8382a;
+    border-radius: 6px;
+    background: #9b3b32;
     color: #fff;
     display: flex;
     align-items: center;
@@ -82,8 +83,8 @@ body {
     flex-shrink: 0;
 }
 
-.brand-title { font: 600 13.5px Inter, sans-serif; color: #fff; }
-.brand-subtitle { font-size: 10.5px; color: #7d838e; }
+.brand-title { font: 600 13.5px Inter, sans-serif; color: #1f2430; }
+.brand-subtitle { font-size: 10.5px; color: #8b93a1; }
 
 .sidebar-nav {
     display: flex;
@@ -103,8 +104,9 @@ body {
     gap: 10px;
     padding: 12px 14px;
     margin: 16px 12px 0;
-    border-radius: 10px;
-    background: #22252b;
+    border-radius: 8px;
+    background: #f4f5f7;
+    border: 1px solid #e9ebee;
 }
 
 .user-avatar {
@@ -113,7 +115,7 @@ body {
     border-radius: 50%;
     flex-shrink: 0;
     overflow: hidden;
-    background: #b8382a;
+    background: #9b3b32;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -125,30 +127,31 @@ body {
 .user-meta { min-width: 0; flex: 1; }
 .user-name {
     font: 600 12px Inter, sans-serif;
-    color: #fff;
+    color: #1f2430;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.user-role { font-size: 11px; color: #7d838e; text-transform: lowercase; }
+.user-role { font-size: 11px; color: #8b93a1; text-transform: lowercase; }
 
 .user-logout {
     flex-shrink: 0;
     font-size: 12px;
     font-weight: 600;
-    color: #c3c7cd;
+    color: #4a5262;
     text-decoration: none;
     padding: 6px 12px;
-    border: 1px solid rgba(255,255,255,.18);
-    border-radius: 8px;
+    border: 1px solid #d7dbe2;
+    border-radius: 6px;
+    background: #fff;
 }
-.user-logout:hover { background: rgba(255,255,255,.08); color: #fff; }
+.user-logout:hover { background: #eef0f3; color: #1f2430; }
 
 .nav-group-label {
     font-size: 10.5px;
     text-transform: uppercase;
     letter-spacing: .06em;
-    color: #666c76;
+    color: #9aa0a8;
     font-weight: 700;
     margin: 14px 10px 6px;
 }
@@ -158,10 +161,10 @@ body {
     align-items: center;
     gap: 10px;
     padding: 10px 10px;
-    border-radius: 8px;
+    border-radius: 6px;
     font-size: 13.5px;
     font-weight: 600;
-    color: #c3c7cd;
+    color: #4a5262;
     text-decoration: none;
     cursor: pointer;
     border-left: 3px solid transparent;
@@ -174,21 +177,21 @@ body {
     opacity: .85;
 }
 
-.nav-item:hover, .nav-parent:hover { background: rgba(255,255,255,.05); }
+.nav-item:hover, .nav-parent:hover { background: #f2f3f5; }
 
 .nav-item.active, .nav-parent.active {
-    background: rgba(184,56,42,.18);
-    color: #e8a89f;
-    border-left-color: #b8382a;
+    background: rgba(155,59,50,.10);
+    color: #9b3b32;
+    border-left-color: #9b3b32;
 }
 .nav-item.active .nav-icon, .nav-parent.active .nav-icon { opacity: 1; }
 
-.nav-item.disabled { color: #565b64; cursor: default; }
+.nav-item.disabled { color: #b3b8bf; cursor: default; }
 .nav-item.disabled .nav-icon { opacity: .4; }
 
 .nav-badge {
     margin-left: auto;
-    background: #b8382a;
+    background: #9b3b32;
     color: #fff;
     font-size: 11px;
     font-weight: 700;
@@ -219,13 +222,13 @@ body {
 .nav-subitem {
     padding: 7px 10px;
     font-size: 13px;
-    color: #8b93a1;
+    color: #6b7280;
     text-decoration: none;
     border-radius: 6px;
 }
-.nav-subitem:hover { background: rgba(255,255,255,.05); color: #c3c7cd; }
-.nav-subitem.active { color: #e8a89f; font-weight: 700; }
-.nav-subdivider { height: 1px; background: rgba(255,255,255,.08); margin: 8px 12px; }
+.nav-subitem:hover { background: #f2f3f5; color: #4a5262; }
+.nav-subitem.active { color: #9b3b32; font-weight: 700; }
+.nav-subdivider { height: 1px; background: #e9ebee; margin: 8px 12px; }
 
 /* ---------- Main area ---------- */
 .app-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
@@ -251,11 +254,47 @@ body {
 .app-topbar p { margin: 0; color: #8b93a1; font-size: 13px; }
 .topbar-date { color: #8b93a1; font-size: 13px; white-space: nowrap; }
 
+/* User chip in the top-right, next to the date */
+.topbar-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+.topbar-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 6px 5px 6px;
+    border: 1px solid #e9ebee;
+    border-radius: 8px;
+    background: #fff;
+}
+.tu-avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: #9b3b32;
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font: 700 12px Inter, sans-serif;
+    overflow: hidden; flex-shrink: 0;
+}
+.tu-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.tu-meta { min-width: 0; line-height: 1.25; }
+.tu-name {
+    font: 600 13px Inter, sans-serif; color: #1f2430;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;
+}
+.tu-role { font-size: 11px; color: #8b93a1; text-transform: lowercase; }
+.tu-logout {
+    flex-shrink: 0;
+    font-size: 12px; font-weight: 600;
+    color: #4a5262; text-decoration: none;
+    padding: 6px 12px;
+    border: 1px solid #d7dbe2; border-radius: 6px; background: #fff;
+}
+.tu-logout:hover { background: #eef0f3; color: #1f2430; }
+
 .topbar-breadcrumb { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
 .topbar-breadcrumb .crumb {
     font-size: 13px;
     font-weight: 600;
-    color: #b8382a;
+    color: #9b3b32;
     text-decoration: none;
     padding: 2px 8px;
     border-radius: 6px;
@@ -272,6 +311,12 @@ body {
     flex-direction: column;
     background: #f2f3f5;
 }
+
+/* Document-style pages (admin, views, drafts) flow naturally with a single
+   page scroll instead of the flex-fill layout used by check sheet forms —
+   so tables show their rows fully instead of collapsing into a tiny window. */
+.app-content-doc { display: block; }
+.app-content-doc .table-scroll { max-height: none; overflow-y: visible; }
 
 .empty-state {
     background: #fff;
@@ -301,6 +346,11 @@ body {
     .app-content { padding: 18px; }
 }
 
+/* No sidebar slide animation while the window is being dragged/resized. */
+body.is-resizing .sidebar,
+body.is-resizing .app-main,
+body.is-resizing .app-content { transition: none !important; }
+
 @media (max-width: 600px) {
     .app-topbar {
         flex-direction: column;
@@ -308,4 +358,7 @@ body {
         gap: 8px;
     }
     .topbar-date { align-self: flex-start; }
+    .topbar-right { align-items: flex-start; width: 100%; }
+    .topbar-breadcrumb { flex-wrap: wrap; }
+    .app-content { padding: 14px; }
 }

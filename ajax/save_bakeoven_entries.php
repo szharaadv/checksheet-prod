@@ -45,9 +45,9 @@ try {
     $updateCols = implode(', ', array_map(fn($k) => "t_$k = VALUES(t_$k)", $timeKeys));
 
     $stmt = $pdo->prepare(
-        "INSERT INTO t_bakeoven_entry (department_id, tanggal, $cols, checker_id)
-         VALUES (?, ?, $placeholders, ?)
-         ON DUPLICATE KEY UPDATE $updateCols, checker_id = VALUES(checker_id)"
+        "INSERT INTO t_bakeoven_entry (department_id, tanggal, $cols)
+         VALUES (?, ?, $placeholders)
+         ON DUPLICATE KEY UPDATE $updateCols"
     );
 
     $today = date('Y-m-d');
@@ -66,7 +66,6 @@ try {
             $v = $row['t_' . $k] ?? '';
             $params[] = $v !== '' ? $v : null;
         }
-        $params[] = $row['checker_id'] ?: null;
         $stmt->execute($params);
     }
 

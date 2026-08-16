@@ -4,7 +4,7 @@
  * $base_url    - '' when included from root pages, '../' when included from admin/ pages
  * $active_nav  - one of: checksheet, config-department, config-condition,
  *                config-checklist, config-shift, config-checked-by-view,
- *                config-users, config-manage-roles, config-roles
+ *                config-calendar, config-users, config-manage-roles, config-roles
  */
 $base_url = $base_url ?? '';
 $active_nav = $active_nav ?? '';
@@ -32,9 +32,11 @@ if (!empty($_SESSION['section_route']) && !empty($_SESSION['department_id'])) {
 }
 $import_qs = $current_section_id ? ('?section_id=' . $current_section_id) : '';
 
-$draft_count = $is_assy_context
-    ? (int)$pdo->query("SELECT COUNT(*) FROM t_assy_header WHERE status = 'draft'")->fetchColumn()
-    : (int)$pdo->query("SELECT COUNT(*) FROM t_checksheet_header WHERE status = 'draft'")->fetchColumn();
+$draft_count = ($_SESSION['section_route'] ?? '') === 'fpcheck_list.php'
+    ? (int)$pdo->query("SELECT COUNT(*) FROM t_fpcs_header WHERE status = 'draft'")->fetchColumn()
+    : ($is_assy_context
+        ? (int)$pdo->query("SELECT COUNT(*) FROM t_assy_header WHERE status = 'draft'")->fetchColumn()
+        : (int)$pdo->query("SELECT COUNT(*) FROM t_checksheet_header WHERE status = 'draft'")->fetchColumn());
 
 $checksheet_href = !empty($_SESSION['section_route'])
     ? $base_url . $_SESSION['section_route']
@@ -49,6 +51,7 @@ $sectionViewMap = [
     'subassy_list.php'        => 'view_subassy_checksheets.php',
     'fopump_list.php'         => 'view_fopump_checksheets.php',
     'bakeoven_list.php'       => 'view_bakeoven_checksheets.php',
+    'fpcheck_list.php'        => 'view_fpcheck_checksheets.php',
 ];
 $view_href = $base_url . ($sectionViewMap[$_SESSION['section_route'] ?? ''] ?? ($is_assy_context ? 'view_assy_checksheets.php' : 'view_checksheets.php'));
 $current_route = $_SESSION['section_route'] ?? '';
@@ -57,9 +60,15 @@ $is_washing_section = $current_route === 'washing_liquid_list.php';
 // share the same UX: no per-sheet drafts, and only the "Checked By"
 // master data applies.
 $is_monthly_monitor = in_array($current_route, ['washing_liquid_list.php', 'subassy_list.php', 'fopump_list.php', 'bakeoven_list.php'], true);
-$drafts_href = $base_url . ($is_monthly_monitor
-    ? 'soon.php?feature=My+Drafts+(not+applicable+to+this+check+sheet)'
-    : ($is_assy_context ? 'my_assy_drafts.php' : 'my_drafts.php'));
+// FO Pump Assy Check Sheet (F-FIP-01): a submit-only check sheet with its own
+// master-data setup — no per-sheet drafts, own Configuration submenu.
+$is_fpcheck = $current_route === 'fpcheck_list.php';
+$no_drafts = $is_monthly_monitor; // fpcheck has its own drafts
+$drafts_href = $base_url . ($is_fpcheck
+    ? 'my_fpcheck_drafts.php'
+    : ($no_drafts
+        ? 'soon.php?feature=My+Drafts+(not+applicable+to+this+check+sheet)'
+        : ($is_assy_context ? 'my_assy_drafts.php' : 'my_drafts.php')));
 
 function icon(string $name): string
 {
@@ -93,9 +102,9 @@ function icon(string $name): string
         <a class="nav-item <?= $active_nav === 'view-checksheets' ? 'active' : '' ?>" href="<?= $view_href ?>">
             <?= icon('folder') ?> View Checksheets
         </a>
-        <a class="nav-item <?= $is_monthly_monitor ? 'disabled' : ($active_nav === 'my-drafts' ? 'active' : '') ?>" href="<?= $drafts_href ?>">
+        <a class="nav-item <?= $no_drafts ? 'disabled' : ($active_nav === 'my-drafts' ? 'active' : '') ?>" href="<?= $drafts_href ?>">
             <?= icon('edit') ?> My Drafts
-            <?php if (!$is_monthly_monitor && $draft_count > 0): ?><span class="nav-badge"><?= $draft_count ?></span><?php endif; ?>
+            <?php if (!$no_drafts && $draft_count > 0): ?><span class="nav-badge"><?= $draft_count ?></span><?php endif; ?>
         </a>
 
         <div class="nav-group-label">Master Data</div>
@@ -104,7 +113,10 @@ function icon(string $name): string
             <span class="nav-chevron">&#8250;</span>
         </div>
         <div class="nav-submenu <?= $config_active ? 'open' : '' ?>" id="config-submenu">
-            <?php if ($is_monthly_monitor): ?>
+            <?php if ($is_fpcheck): ?>
+                <a class="nav-subitem <?= $active_nav === 'config-fpcheck' ? 'active' : '' ?>" href="<?= $base_url ?>admin/fpcheck_points.php">Check Points &amp; Types</a>
+                <a class="nav-subitem <?= $active_nav === 'config-checked-by-view' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checked_by.php">Checked By</a>
+            <?php elseif ($is_monthly_monitor): ?>
                 <a class="nav-subitem <?= $active_nav === 'config-checked-by-view' ? 'active' : '' ?>" href="<?= $base_url ?>admin/checked_by.php">Checked By</a>
                 <a class="nav-subitem <?= $active_nav === 'config-guide' ? 'active' : '' ?>" href="<?= $base_url ?>admin/check_guides.php">Checking Guide</a>
             <?php elseif ($is_assy_context): ?>
@@ -120,6 +132,7 @@ function icon(string $name): string
             <div class="nav-subdivider"></div>
             <a class="nav-subitem <?= $active_nav === 'config-import' ? 'active' : '' ?>" href="<?= $base_url ?>admin/import_data.php<?= $import_qs ?>">Import Data</a>
             <a class="nav-subitem" href="<?= $base_url ?>admin/import_data.php<?= $import_qs ? $import_qs . '&' : '?' ?>action=export">Export Data</a>
+            <a class="nav-subitem <?= $active_nav === 'config-calendar' ? 'active' : '' ?>" href="<?= $base_url ?>admin/calendar_holidays.php">Company Calendar</a>
         </div>
 
         <div class="nav-group-label">Management</div>
@@ -137,22 +150,6 @@ function icon(string $name): string
         </a>
     </nav>
 
-    <?php if ($me): ?>
-    <div class="sidebar-user">
-        <div class="user-avatar">
-            <?php if (!empty($me['avatar'])): ?>
-                <img src="<?= htmlspecialchars($me['avatar']) ?>" alt="">
-            <?php else: ?>
-                <span><?= htmlspecialchars(user_initials($me['name'])) ?></span>
-            <?php endif; ?>
-        </div>
-        <div class="user-meta">
-            <div class="user-name" title="<?= htmlspecialchars($me['name']) ?>"><?= htmlspecialchars($me['name']) ?></div>
-            <div class="user-role"><?= htmlspecialchars($me['role']) ?></div>
-        </div>
-        <a class="user-logout" href="<?= $base_url ?>logout.php">Logout</a>
-    </div>
-    <?php endif; ?>
 </aside>
 <script>
 document.getElementById('config-toggle').addEventListener('click', function () {

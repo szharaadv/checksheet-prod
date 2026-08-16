@@ -6,7 +6,12 @@ $pdo = get_db();
 $input = json_decode(file_get_contents('php://input'), true);
 
 $header_id      = (int)($input['header_id'] ?? 0);
-$tanggal        = date('Y-m-d');
+$tanggal        = $input['tanggal'] ?? date('Y-m-d');
+// Validate date; reject invalid or future dates (backdate allowed).
+$d = DateTime::createFromFormat('Y-m-d', $tanggal);
+if (!$d || $d->format('Y-m-d') !== $tanggal || $tanggal > date('Y-m-d')) {
+    $tanggal = date('Y-m-d');
+}
 $department_id  = (int)($input['department_id'] ?? 0);
 $condition_id   = (int)($input['condition_id'] ?? 0);
 $checker_id     = (int)($input['checker_id'] ?? 0);
